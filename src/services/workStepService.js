@@ -23,9 +23,16 @@ const deleteEntity = async (id) => {
     return workStepAccessor.deleteEntity(id);
 } 
 
+const getById = async (id) => {
+    // Placeholder: Logic to get a work step by id
+    // This should call the accessor to perform the retrieval
+    return workStepAccessor.getById(id);
+}
+
 module.exports = {
   saveWorkStep,
   getAllWorkStepsForNextStep,
   getAllWorkStepsForListPage,
-  deleteEntity
+  deleteEntity,
+  getById
 };

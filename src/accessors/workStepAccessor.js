@@ -135,4 +135,19 @@ async function deleteEntity(id) {
     }
 }
 
-module.exports = { upsertWorkStep, getAllWorkSteps, getAllWorkStepsWithProjection, getAllWorkStepsForListPage, deleteEntity };
+async function getById(id) {
+    try {
+        await connectToMongo();
+
+        // Find WorkStep by _id (string or ObjectId)
+        const objectId = mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id;
+        const result = await WorkStep.findOne({ _id: objectId });
+
+        return result;
+    } catch (err) {
+        console.error('Error getById:', err.message);
+        throw err;
+    }
+}
+
+module.exports = { upsertWorkStep, getAllWorkSteps, getAllWorkStepsWithProjection, getAllWorkStepsForListPage, deleteEntity, getById };

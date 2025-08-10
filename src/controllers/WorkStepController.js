@@ -15,7 +15,7 @@ const getAllWorkStepsForNextStep = async (req, res) => {
 const getById = async (req, res) => {
     const { id } = req.params;
     // Placeholder: Fetch work step by id from database
-    res.json({ message: `Details of work step with id ${id}` });
+    res.json(await workStepService.getById(id));
 }
 
 // POST /work-step
@@ -28,8 +28,13 @@ const create = async (req, res) => {
 // PUT /work-step/:id
 const update = async (req, res) => {
     const { id } = req.params;
+
+    // Placeholder: Logic to update work step by id
+    // This should call the service to perform the update
+    const result = await workStepService.saveWorkStep({ ...req.body, id });
+
     // Placeholder: Update work step by id
-    res.json({ message: `Work step with id ${id} updated` });
+    res.json({ result, message: `Work step with id ${id} updated` });
 }
 
 // DELETE /work-step/:id
