@@ -1,10 +1,12 @@
 const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 4000;
+const cors = require('cors')
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors())
 
 const workStepRoutes = require('./routes/workStepRoutes');
 app.use("/work-step", workStepRoutes);

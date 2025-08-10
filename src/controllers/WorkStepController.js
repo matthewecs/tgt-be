@@ -2,8 +2,13 @@ const workStepService = require("../services/workStepService");
 
 // GET /work-step
 const getAll = async (req, res) => {
-    // Placeholder: Fetch all work steps from database
-    res.json({ message: 'List of all work steps' });
+    const { keyword, page, take} = req.query;
+
+    res.json(await workStepService.getAllWorkStepsForListPage(keyword, page, take));
+}
+
+const getAllWorkStepsForNextStep = async (req, res) => {
+    res.json(await workStepService.getAllWorkStepsForNextStep(req.query.currentStep))
 }
 
 // GET /work-step/:id
@@ -15,9 +20,6 @@ const getById = async (req, res) => {
 
 // POST /work-step
 const create = async (req, res) => {
-    console.log(req.body)
-    // Placeholder: Create a new work step
-
     workStepService.saveWorkStep(req.body);
 
     res.status(201).json({ message: 'Work step created' });
@@ -33,7 +35,9 @@ const update = async (req, res) => {
 // DELETE /work-step/:id
 const deleteEntity = async (req, res) => {
     const { id } = req.params;
-    // Placeholder: Delete work step by id
+
+    await workStepService.deleteEntity(id);
+
     res.json({ message: `Work step with id ${id} deleted` });
 }
 
@@ -43,5 +47,6 @@ module.exports = {
     getById,
     create,
     update,
-    deleteEntity
+    deleteEntity,
+    getAllWorkStepsForNextStep
 };
