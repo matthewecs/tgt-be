@@ -33,6 +33,7 @@ async function upsertWorkStep(datum) {
 
         const uniqueKey = _.kebabCase(datum.name)
         await WorkStep.deleteOne({uniqueKey: uniqueKey});
+        await WorkStep.deleteOne({_id: datum.id});
 
         const transformed = {
             _id: datum.id,
