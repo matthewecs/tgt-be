@@ -29,10 +29,21 @@ const getById = async (id) => {
     return workStepAccessor.getById(id);
 }
 
+const getByName = async (name) => {
+    // Logic to get a work step by name
+    return workStepAccessor.getByName(name);
+}
+const findsByUniqueKeys = async (uniqueKeys) => {
+    // Logic to get work steps by an array of unique keys
+    return workStepAccessor.findsByUniqueKeys(uniqueKeys);
+}
+
 module.exports = {
   saveWorkStep,
   getAllWorkStepsForNextStep,
   getAllWorkStepsForListPage,
   deleteEntity,
-  getById
+  getById,
+  getByName,
+  findsByUniqueKeys
 };

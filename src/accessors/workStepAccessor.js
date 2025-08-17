@@ -151,4 +151,26 @@ async function getById(id) {
     }
 }
 
-module.exports = { upsertWorkStep, getAllWorkSteps, getAllWorkStepsWithProjection, getAllWorkStepsForListPage, deleteEntity, getById };
+async function getByName(name) {
+    try {
+        await connectToMongo();
+        // Find WorkStep by name (case-insensitive)
+        return await WorkStep.findOne({ uniqueKey: _.kebabCase(name) });
+    } catch (err) {
+        console.error('Error getByName:', err.message);
+        throw err;
+    }
+}
+
+async function findsByUniqueKeys(uniqueKeys) {
+    try {
+        await connectToMongo();
+        // Find WorkSteps by an array of uniqueKeys
+        return await WorkStep.find({ uniqueKey: { $in: uniqueKeys } });
+    } catch (err) {
+        console.error('Error findsByUniqueKeys:', err.message);
+        throw err;
+    }
+}
+
+module.exports = { upsertWorkStep, getAllWorkSteps, getAllWorkStepsWithProjection, getAllWorkStepsForListPage, deleteEntity, getById, getByName, findsByUniqueKeys };
