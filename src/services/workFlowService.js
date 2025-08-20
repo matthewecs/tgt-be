@@ -54,7 +54,7 @@ const getNextAvailableStep = async (currentStep, value) => {
             description: nextWorkStep.description,
             options: nextWorkStep.options.map(opt => {
                 const eligible = true;
-                const conversionRate = Math.ceil(value / opt.quantity);
+                const conversionRate = Math.ceil(value / opt.preReqValue);
                 const quantity = conversionRate * opt.quantity;
 
                 return {
