@@ -60,6 +60,45 @@ async function getAllWorkFlows() {
     }
 }
 
+async function getAllWorkFlowsForListPage(keyword, page = 1, take = 10) {
+    try {
+        await connectToMongo();
+        
+        // Build filter for keyword search (case-insensitive, partial match on projectName or employeeName)
+        const filter = keyword
+            ? {
+                $or: [
+                    { projectName: { $regex: keyword, $options: 'i' } },
+                    { employeeName: { $regex: keyword, $options: 'i' } }
+                ]
+            }
+            : {};
+
+        // Pagination
+        const skip = (parseInt(page) - 1) * parseInt(take);
+        const limit = parseInt(take);
+
+        // Query with filter, pagination, and sort by createdAt
+        const items = await WorkFlow.find(filter)
+            .skip(skip)
+            .limit(limit)
+            .sort({ createdAt: -1 });
+
+        const total = await WorkFlow.countDocuments(filter);
+
+        return {
+            data: items,
+            page: parseInt(page),
+            take: parseInt(take),
+            total,
+            totalPages: Math.ceil(total / take)
+        };
+    } catch (err) {
+        console.error('Error getAllWorkFlowsForListPage:', err.message);
+        throw err;
+    }
+}
+
 async function getWorkFlowById(id) {
     try {
         await connectToMongo();
@@ -97,6 +136,7 @@ async function deleteWorkFlow(id) {
 module.exports = {
     createWorkFlow,
     getAllWorkFlows,
+    getAllWorkFlowsForListPage,
     getWorkFlowById,
     updateWorkFlow,
     deleteWorkFlow

@@ -3,8 +3,13 @@ const workFlowService = require('../services/workFlowService');
 
 // GET /workflow
 const getAll = async (req, res) => {
-    // Placeholder: Fetch all workflows from database
-    res.json({ message: 'List of all workflows' });
+    try {
+        const { keyword, page = 1, take = 10 } = req.query;
+        const result = await workFlowService.getAllWorkflows(keyword, page, take);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };
 
 // GET /workflow/:id

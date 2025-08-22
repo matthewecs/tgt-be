@@ -2,8 +2,8 @@ const _ = require('lodash');
 const workStepService = require('./workStepService');
 const workFlowAccessor = require('../accessors/workFlowAccessor');
 
-const getAllWorkflows = async () => {
-    return workFlowAccessor.getAllWorkFlows();
+const getAllWorkflows = async (keyword, page = 1, take = 10) => {
+    return workFlowAccessor.getAllWorkFlowsForListPage(keyword, page, take);
 };
 
 const getWorkflowById = async (id) => {
