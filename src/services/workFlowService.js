@@ -1,32 +1,42 @@
 const _ = require('lodash');
 const workStepService = require('./workStepService');
+const workFlowAccessor = require('../accessors/workFlowAccessor');
 
 const getAllWorkflows = async () => {
-    // Placeholder: Fetch all workflows from database
-    return [];
+    return workFlowAccessor.getAllWorkFlows();
 };
 
 const getWorkflowById = async (id) => {
-    // Placeholder: Fetch workflow by id from database
-    return { id };
+    return workFlowAccessor.getWorkFlowById(id);
 };
 
 const createWorkflow = async (data) => {
-    // Placeholder: Create a new workflow
-    return { ...data };
+    // Transform input data to match the required schema
+    const transformedData = {
+        projectName: data.projectName || "AMDK Sample", // Default project name if not provided
+        targetProductionCapacity: data.targetProductionCapacity,
+        selectedSteps: data.selectedSteps.map(step => ({
+            step: step.step,
+            selectedOption: step.selectedOption
+        })),
+        totalSteps: data.totalSteps,
+        employeeName: data.employeeName || "Andi", // Default employee name if not provided
+        createdAt: data.createdAt || new Date(),
+        updatedAt: new Date()
+    };
+    
+    return workFlowAccessor.createWorkFlow(transformedData);
 };
 
 const updateWorkflow = async (id, data) => {
-    // Placeholder: Update workflow by id
-    return { id, ...data };
+    return workFlowAccessor.updateWorkFlow(id, data);
 };
 
 const deleteWorkflow = async (id) => {
-    // Placeholder: Delete workflow by id
-    return { id };
+    return workFlowAccessor.deleteWorkFlow(id);
 };
 
-const getNextAvailableStep = async (currentStep, value) => {
+const getNextAvailableStep = async (currentStep, value, selectedOption) => {
     // Placeholder: Logic to get the next available step
     const workStep = await workStepService.getByName(currentStep);
 
@@ -54,7 +64,8 @@ const getNextAvailableStep = async (currentStep, value) => {
             description: nextWorkStep.description,
             options: nextWorkStep.options.map(opt => {
                 const eligible = true;
-                const conversionRate = Math.ceil(value / opt.preReqValue);
+                const base = selectedOption ? selectedOption.option.metricValue * selectedOption.option.quantity : value;
+                const conversionRate = Math.ceil(base / opt.preReqValue);
                 const quantity = conversionRate * opt.quantity;
 
                 return {

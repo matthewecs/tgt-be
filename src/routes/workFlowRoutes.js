@@ -12,7 +12,7 @@ router.post('/get-next-available-step', workFlowController.getNextAvailableStep)
 router.get('/:id', workFlowController.getById);
 
 // CREATE a new workflow
-router.post('/', workFlowController.create);
+router.post('/_create', workFlowController.create);
 
 // UPDATE a workflow by ID
 router.put('/:id', workFlowController.update);

@@ -16,8 +16,13 @@ const getById = async (req, res) => {
 
 // POST /workflow
 const create = async (req, res) => {
-    // Placeholder: Create a new workflow
-    res.status(201).json({ message: 'Workflow created' });
+    try {
+        const data = req.body;
+        const result = await workFlowService.createWorkflow(data);
+        res.status(201).json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };
 
 // PUT /workflow/:id
@@ -36,9 +41,9 @@ const deleteEntity = async (req, res) => {
 
 // GET /get-next-available-step
 const getNextAvailableStep = async (req, res) => {
-    const { currentStep, value } = req.body;
+    const { currentStep, value, selectedOption } = req.body;
 
-    workFlowService.getNextAvailableStep(currentStep, value)
+    workFlowService.getNextAvailableStep(currentStep, value, selectedOption)
         .then(nextSteps => {
             res.json({ nextSteps });
         })
