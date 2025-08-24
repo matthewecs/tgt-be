@@ -20,6 +20,9 @@ app.use("/customer", customerRoutes);
 const workStepCategoryRoutes = require('./routes/workStepCategoryRoutes');
 app.use("/workstep-category", workStepCategoryRoutes);
 
+const projectRoutes = require('./routes/projectRoutes');
+app.use("/project", projectRoutes);
+
 app.listen(PORT, (error) =>{
     if(!error)
         console.log("Server is Successfully Running, and App is listening on port "+ PORT);
