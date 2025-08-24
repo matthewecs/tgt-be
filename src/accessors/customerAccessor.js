@@ -116,6 +116,17 @@ async function updateCustomer(id, data) {
     }
 }
 
+async function getCustomersByIds(ids) {
+    try {
+        await connectToMongo();
+        const objectIds = ids.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
+        return await Customer.find({ _id: { $in: objectIds } }, { companyName: 1, address: 1 });
+    } catch (err) {
+        console.error('Error getCustomersByIds:', err.message);
+        throw err;
+    }
+}
+
 async function deleteCustomer(id) {
     try {
         await connectToMongo();
@@ -133,6 +144,7 @@ module.exports = {
     getAllCustomersForDropdownOption,
     getAllCustomersForListPage,
     getCustomerById,
+    getCustomersByIds,
     updateCustomer,
     deleteCustomer
 };
