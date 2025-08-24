@@ -64,13 +64,17 @@ async function getAllWorkSteps() {
     }
 }
 
-async function getAllWorkStepsWithProjection() {
+async function getAllWorkStepsWithProjection(categoryId = null) {
     try {
         await connectToMongo();
 
-        return WorkStep.find({}, {
+        // Build filter for categoryId if provided
+        const filter = categoryId ? { categoryId } : {};
+
+        return WorkStep.find(filter, {
             name: 1,
-            uniqueKey: 1
+            uniqueKey: 1,
+            categoryId: 1
         });
     } catch (err) {
         console.error('Error getAllWorkSteps:', err.message);

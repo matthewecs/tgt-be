@@ -8,7 +8,7 @@ const getAll = async (req, res) => {
 }
 
 const getAllWorkStepsForNextStep = async (req, res) => {
-    res.json(await workStepService.getAllWorkStepsForNextStep(req.query.currentStep))
+    res.json(await workStepService.getAllWorkStepsForNextStep(req.query.categoryId, req.query.currentStep))
 }
 
 // GET /work-step/:id

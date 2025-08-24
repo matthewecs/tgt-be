@@ -5,8 +5,8 @@ const saveWorkStep = async (data) => {
     return workStepAccessor.upsertWorkStep(data);
 }
 
-const getAllWorkStepsForNextStep = async (currentStep) => {
-    const data = await workStepAccessor.getAllWorkStepsWithProjection();
+const getAllWorkStepsForNextStep = async (categoryId, currentStep) => {
+    const data = await workStepAccessor.getAllWorkStepsWithProjection(categoryId);
 
     _.filter(data, datum => datum.uniqueKey !== currentStep);
 
