@@ -14,6 +14,9 @@ app.use("/work-step", workStepRoutes);
 const workFlowRoutes = require('./routes/workFlowRoutes');
 app.use("/workflow", workFlowRoutes);
 
+const customerRoutes = require('./routes/customerRoutes');
+app.use("/customer", customerRoutes);
+
 app.listen(PORT, (error) =>{
     if(!error)
         console.log("Server is Successfully Running, and App is listening on port "+ PORT);
