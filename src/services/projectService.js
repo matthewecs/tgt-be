@@ -14,7 +14,7 @@ const getAllProjects = async (keyword, page = 1, take = 10) => {
     projects.data.forEach(project => {
         const customer = customers.find(c => c._id.toString() === project.customerId.toString());
         if (customer) {
-            project.customerId = customer;
+            project.customer = customer;
         }
     });
 
