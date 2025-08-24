@@ -5,6 +5,9 @@ const customerController = require('../controllers/customerController');
 // GET all customers
 router.get('/', customerController.getAll);
 
+// GET all customers for dropdown options (id, name, and address only)
+router.get('/getAllForDropdownOption', customerController.getAllForDropdownOption);
+
 // GET customer by ID
 router.get('/:id', customerController.getById);
 

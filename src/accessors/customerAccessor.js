@@ -43,6 +43,16 @@ async function getAllCustomers() {
     }
 }
 
+async function getAllCustomersForDropdownOption() {
+    try {
+        await connectToMongo();
+        return await Customer.find({}, { companyName: 1, address: 1 });
+    } catch (err) {
+        console.error('Error getAllCustomersForDropdownOption:', err.message);
+        throw err;
+    }
+}
+
 async function getAllCustomersForListPage(keyword, page = 1, take = 10) {
     try {
         await connectToMongo();
@@ -120,6 +130,7 @@ async function deleteCustomer(id) {
 module.exports = {
     createCustomer,
     getAllCustomers,
+    getAllCustomersForDropdownOption,
     getAllCustomersForListPage,
     getCustomerById,
     updateCustomer,

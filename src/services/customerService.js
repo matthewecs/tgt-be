@@ -4,6 +4,10 @@ const getAllCustomers = async (keyword, page = 1, take = 10) => {
     return customerAccessor.getAllCustomersForListPage(keyword, page, take);
 };
 
+const getAllCustomersForDropdownOption = async () => {
+    return customerAccessor.getAllCustomersForDropdownOption();
+};
+
 const getCustomerById = async (id) => {
     return customerAccessor.getCustomerById(id);
 };
@@ -25,6 +29,7 @@ const deleteCustomer = async (id) => {
 
 module.exports = {
     getAllCustomers,
+    getAllCustomersForDropdownOption,
     getCustomerById,
     createCustomer,
     updateCustomer,

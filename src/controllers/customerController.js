@@ -11,6 +11,16 @@ const getAll = async (req, res) => {
     }
 };
 
+// GET /customer/getAllForDropdownOption - Get all customers for dropdown options
+const getAllForDropdownOption = async (req, res) => {
+    try {
+        const result = await customerService.getAllCustomersForDropdownOption();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // GET /customer/:id
 const getById = async (req, res) => {
     try {
@@ -67,6 +77,7 @@ const deleteEntity = async (req, res) => {
 
 module.exports = {
     getAll,
+    getAllForDropdownOption,
     getById,
     create,
     update,
