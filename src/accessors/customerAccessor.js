@@ -11,6 +11,7 @@ const ContactSchema = new mongoose.Schema({
 
 const CustomerSchema = new mongoose.Schema({
     companyName: { type: String, required: true },
+    address: { type: String, default: null },
     contacts: { type: [ContactSchema], default: [] },
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     joinDate: { type: Date, default: Date.now },
