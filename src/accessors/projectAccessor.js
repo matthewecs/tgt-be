@@ -59,7 +59,6 @@ async function getAllProjectsForListPage(keyword, page = 1, take = 10) {
 
         // Query with filter, pagination, and sort by name
         const items = await Project.find(filter)
-            .populate('customerId', 'companyName')
             .skip(skip)
             .limit(limit)
             .sort({ name: 1 });

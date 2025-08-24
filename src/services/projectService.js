@@ -11,11 +11,15 @@ const getAllProjects = async (keyword, page = 1, take = 10) => {
     const customers = await customerAccessor.getCustomersByIds(customerIds);
 
     // Set customer data into each project
-    projects.data.forEach(project => {
+    projects.data = projects.data.map(project => {
         const customer = customers.find(c => c._id.toString() === project.customerId.toString());
         if (customer) {
-            project.customer = customer;
+            // Convert to plain object and add customer field
+            const projectObj = project.toObject ? project.toObject() : { ...project };
+            projectObj.customer = customer;
+            return projectObj;
         }
+        return project.toObject ? project.toObject() : { ...project };
     });
 
     return projects;
