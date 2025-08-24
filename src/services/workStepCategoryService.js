@@ -4,6 +4,10 @@ const getAllWorkStepCategories = async (keyword, page = 1, take = 10) => {
     return workStepCategoryAccessor.getAllWorkStepCategoriesForListPage(keyword, page, take);
 };
 
+const getAllWorkStepCategoriesForDropdownOption = async () => {
+    return workStepCategoryAccessor.getAllWorkStepCategoriesForDropdownOption();
+};
+
 const getWorkStepCategoryById = async (id) => {
     return workStepCategoryAccessor.getWorkStepCategoryById(id);
 };
@@ -25,6 +29,7 @@ const deleteWorkStepCategory = async (id) => {
 
 module.exports = {
     getAllWorkStepCategories,
+    getAllWorkStepCategoriesForDropdownOption,
     getWorkStepCategoryById,
     createWorkStepCategory,
     updateWorkStepCategory,

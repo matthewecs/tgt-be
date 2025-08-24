@@ -32,6 +32,16 @@ async function getAllWorkStepCategories() {
     }
 }
 
+async function getAllWorkStepCategoriesForDropdownOption() {
+    try {
+        await connectToMongo();
+        return await WorkStepCategory.find({}, { name: 1, description: 1 });
+    } catch (err) {
+        console.error('Error getAllWorkStepCategoriesForDropdownOption:', err.message);
+        throw err;
+    }
+}
+
 async function getAllWorkStepCategoriesForListPage(keyword, page = 1, take = 10) {
     try {
         await connectToMongo();
@@ -108,6 +118,7 @@ async function deleteWorkStepCategory(id) {
 module.exports = {
     createWorkStepCategory,
     getAllWorkStepCategories,
+    getAllWorkStepCategoriesForDropdownOption,
     getAllWorkStepCategoriesForListPage,
     getWorkStepCategoryById,
     updateWorkStepCategory,

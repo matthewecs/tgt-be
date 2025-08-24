@@ -5,6 +5,9 @@ const workStepCategoryController = require('../controllers/workStepCategoryContr
 // GET all workstep categories
 router.get('/', workStepCategoryController.getAll);
 
+// GET all workstep categories for dropdown options (name and description only)
+router.get('/getAllForDropdownOption', workStepCategoryController.getAllForDropdownOption);
+
 // GET workstep category by ID
 router.get('/:id', workStepCategoryController.getById);
 

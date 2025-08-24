@@ -11,6 +11,16 @@ const getAll = async (req, res) => {
     }
 };
 
+// GET /workstep-category/getAllForDropdownOption - Get all categories for dropdown options
+const getAllForDropdownOption = async (req, res) => {
+    try {
+        const result = await workStepCategoryService.getAllWorkStepCategoriesForDropdownOption();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // GET /workstep-category/:id
 const getById = async (req, res) => {
     try {
@@ -67,6 +77,7 @@ const deleteEntity = async (req, res) => {
 
 module.exports = {
     getAll,
+    getAllForDropdownOption,
     getById,
     create,
     update,

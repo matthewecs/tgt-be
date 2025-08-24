@@ -20,6 +20,7 @@ const NextActionSchema = new mongoose.Schema({
 const WorkStepSchema = new mongoose.Schema({
     name: { type: String, required: true },
     uniqueKey: { type: String, required: true },
+    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'WorkStepCategory', required: true },
     description: { type: String },
     options: { type: [OptionSchema], default: [] },
     nextActions: { type: [NextActionSchema], default: [] }
@@ -31,7 +32,7 @@ async function upsertWorkStep(datum) {
     try {
         await connectToMongo();
 
-        const uniqueKey = _.kebabCase(datum.name)
+        const uniqueKey = datum.categoryId + '-' + _.kebabCase(datum.name)
         await WorkStep.deleteOne({uniqueKey: uniqueKey});
         await WorkStep.deleteOne({_id: datum.id});
 
