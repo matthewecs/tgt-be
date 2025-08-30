@@ -39,6 +39,16 @@ async function getAllProjects() {
     }
 }
 
+async function getAllProjectsForDropdownOption() {
+    try {
+        await connectToMongo();
+        return await Project.find({}, { name: 1, customerId: 1 });
+    } catch (err) {
+        console.error('Error getAllProjectsForDropdownOption:', err.message);
+        throw err;
+    }
+}
+
 async function getAllProjectsForListPage(keyword, page = 1, take = 10) {
     try {
         await connectToMongo();
@@ -115,6 +125,7 @@ async function deleteProject(id) {
 module.exports = {
     createProject,
     getAllProjects,
+    getAllProjectsForDropdownOption,
     getAllProjectsForListPage,
     getProjectById,
     updateProject,

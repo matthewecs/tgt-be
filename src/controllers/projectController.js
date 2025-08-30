@@ -11,6 +11,16 @@ const getAll = async (req, res) => {
     }
 };
 
+// GET /project/getAllForDropdownOption
+const getAllForDropdownOption = async (req, res) => {
+    try {
+        const result = await projectService.getAllProjectsForDropdownOption();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // GET /project/:id
 const getById = async (req, res) => {
     try {
@@ -67,6 +77,7 @@ const deleteEntity = async (req, res) => {
 
 module.exports = {
     getAll,
+    getAllForDropdownOption,
     getById,
     create,
     update,

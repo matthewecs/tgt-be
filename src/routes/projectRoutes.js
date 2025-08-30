@@ -5,6 +5,9 @@ const projectController = require('../controllers/projectController');
 // GET all projects
 router.get('/', projectController.getAll);
 
+// GET all projects for dropdown options (id, name only)
+router.get('/getAllForDropdownOption', projectController.getAllForDropdownOption);
+
 // GET project by ID
 router.get('/:id', projectController.getById);
 

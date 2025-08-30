@@ -156,11 +156,11 @@ async function getById(id) {
     }
 }
 
-async function getByName(name) {
+async function getByName(name, categoryId) {
     try {
         await connectToMongo();
         // Find WorkStep by name (case-insensitive)
-        return await WorkStep.findOne({ uniqueKey: _.kebabCase(name) });
+        return await WorkStep.findOne({ uniqueKey: categoryId + '-' + _.kebabCase(name) });
     } catch (err) {
         console.error('Error getByName:', err.message);
         throw err;

@@ -29,9 +29,15 @@ const getById = async (id) => {
     return workStepAccessor.getById(id);
 }
 
-const getByName = async (name) => {
+const getByName = async (name, categoryId) => {
     // Logic to get a work step by name
-    return workStepAccessor.getByName(name);
+    // If name starts with categoryId, remove the categoryId prefix
+    let processedName = name;
+    if (categoryId && name.startsWith(categoryId)) {
+        processedName = name.substring(categoryId.length).replace(/^-+/, ''); // Remove categoryId and leading dashes
+    }
+    
+    return workStepAccessor.getByName(processedName, categoryId);
 }
 const findsByUniqueKeys = async (uniqueKeys) => {
     // Logic to get work steps by an array of unique keys

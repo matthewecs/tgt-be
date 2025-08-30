@@ -36,9 +36,9 @@ const deleteWorkflow = async (id) => {
     return workFlowAccessor.deleteWorkFlow(id);
 };
 
-const getNextAvailableStep = async (currentStep, value, selectedOption) => {
+const getNextAvailableStep = async (currentStep, value, selectedOption, categoryId) => {
     // Placeholder: Logic to get the next available step
-    const workStep = await workStepService.getByName(currentStep);
+    const workStep = await workStepService.getByName(currentStep, categoryId);
 
     if (!workStep) {
         throw new Error(`Work step with name ${currentStep} not found`);

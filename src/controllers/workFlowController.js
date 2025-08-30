@@ -46,9 +46,9 @@ const deleteEntity = async (req, res) => {
 
 // GET /get-next-available-step
 const getNextAvailableStep = async (req, res) => {
-    const { currentStep, value, selectedOption } = req.body;
+    const { currentStep, value, selectedOption, categoryId } = req.body;
 
-    workFlowService.getNextAvailableStep(currentStep, value, selectedOption)
+    workFlowService.getNextAvailableStep(currentStep, value, selectedOption, categoryId)
         .then(nextSteps => {
             res.json({ nextSteps });
         })

@@ -127,6 +127,17 @@ async function getCustomersByIds(ids) {
     }
 }
 
+async function getNameAndAddressByIds(ids) {
+    try {
+        await connectToMongo();
+        const objectIds = ids.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id);
+        return await Customer.find({ _id: { $in: objectIds } }, { companyName: 1, address: 1 });
+    } catch (err) {
+        console.error('Error getNameAndAddressByIds:', err.message);
+        throw err;
+    }
+}
+
 async function deleteCustomer(id) {
     try {
         await connectToMongo();
@@ -145,6 +156,7 @@ module.exports = {
     getAllCustomersForListPage,
     getCustomerById,
     getCustomersByIds,
+    getNameAndAddressByIds,
     updateCustomer,
     deleteCustomer
 };

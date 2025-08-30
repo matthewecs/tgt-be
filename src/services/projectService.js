@@ -25,6 +25,22 @@ const getAllProjects = async (keyword, page = 1, take = 10) => {
     return projects;
 };
 
+const getAllProjectsForDropdownOption = async () => {
+    const projects = await projectAccessor.getAllProjectsForDropdownOption();
+
+    const customerIds = projects.map(project => project.customerId).filter(id => id);
+    const customers = await customerAccessor.getNameAndAddressByIds(customerIds);
+
+    return projects.map(project => {
+        const customer = customers.find(c => c._id.toString() === project.customerId.toString());
+        const projectObj = project.toObject ? project.toObject() : { ...project };
+        if (customer) {
+            projectObj.customer = customer;
+        }
+        return projectObj;
+    });
+};
+
 const getProjectById = async (id) => {
     return projectAccessor.getProjectById(id);
 };
@@ -46,6 +62,7 @@ const deleteProject = async (id) => {
 
 module.exports = {
     getAllProjects,
+    getAllProjectsForDropdownOption,
     getProjectById,
     createProject,
     updateProject,
