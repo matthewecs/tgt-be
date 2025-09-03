@@ -2,9 +2,9 @@ const workStepService = require("../services/workStepService");
 
 // GET /work-step
 const getAll = async (req, res) => {
-    const { keyword, page, take} = req.query;
+    const { keyword, page, take, categoryId } = req.query;
 
-    res.json(await workStepService.getAllWorkStepsForListPage(keyword, page, take));
+    res.json(await workStepService.getAllWorkStepsForListPage(keyword, page, take, categoryId));
 }
 
 const getAllWorkStepsForNextStep = async (req, res) => {

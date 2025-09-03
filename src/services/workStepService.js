@@ -13,8 +13,8 @@ const getAllWorkStepsForNextStep = async (categoryId, currentStep) => {
     return data;
 }
 
-const getAllWorkStepsForListPage = async (keyword, page, take) => {
-    return workStepAccessor.getAllWorkStepsForListPage(keyword, page, take);
+const getAllWorkStepsForListPage = async (keyword, page, take, categoryId) => {
+    return workStepAccessor.getAllWorkStepsForListPage(keyword, page, take, categoryId);
 }
 
 const deleteEntity = async (id) => {

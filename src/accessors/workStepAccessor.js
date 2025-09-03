@@ -82,18 +82,25 @@ async function getAllWorkStepsWithProjection(categoryId = null) {
     }
 }
 
-async function getAllWorkStepsForListPage(keyword, page = 1, take = 10) {
+async function getAllWorkStepsForListPage(keyword, page = 1, take = 10, categoryId = null) {
     try {
         await connectToMongo();
-       // Build filter for keyword search (case-insensitive, partial match on name or description)
-        const filter = keyword
-            ? {
-                $or: [
-                    { name: { $regex: keyword, $options: 'i' } },
-                    { description: { $regex: keyword, $options: 'i' } }
-                ]
-            }
-            : {};
+        
+        // Build filter for keyword search and optional categoryId
+        const filter = {};
+        
+        // Add keyword search filter
+        if (keyword) {
+            filter.$or = [
+                { name: { $regex: keyword, $options: 'i' } },
+                { description: { $regex: keyword, $options: 'i' } }
+            ];
+        }
+        
+        // Add categoryId filter if provided
+        if (categoryId) {
+            filter.categoryId = categoryId;
+        }
 
         const projection = {
             name: 1,
