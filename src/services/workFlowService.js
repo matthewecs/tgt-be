@@ -7,13 +7,33 @@ const getAllWorkflows = async (keyword, page = 1, take = 10) => {
 };
 
 const getWorkflowById = async (id) => {
-    return workFlowAccessor.getWorkFlowById(id);
+    const workflow = await workFlowAccessor.getWorkFlowById(id);
+    
+    if (!workflow) {
+        return null;
+    }
+
+    // Convert to plain object if it's a Mongoose document
+    const workflowObj = workflow.toObject ? workflow.toObject() : { ...workflow };
+    
+    // If workflow has a projectId, fetch project details with customer
+    if (workflowObj.projectId) {
+        const projectService = require('./projectService');
+        const project = await projectService.getProjectById(workflowObj.projectId);
+        
+        if (project) {
+            workflowObj.project = project;
+        }
+    }
+    
+    return workflowObj;
 };
 
 const createWorkflow = async (data) => {
     // Transform input data to match the required schema
     const transformedData = {
         projectName: data.projectName || "AMDK Sample", // Default project name if not provided
+        projectId: data.projectId || null, // Optional project ID reference
         targetProductionCapacity: data.targetProductionCapacity,
         selectedSteps: data.selectedSteps.map(step => ({
             step: step.step,
@@ -33,7 +53,12 @@ const updateWorkflow = async (id, data) => {
 };
 
 const deleteWorkflow = async (id) => {
-    return workFlowAccessor.deleteWorkFlow(id);
+    // Soft delete: update status to 'deleted' instead of removing the record
+    const updateData = {
+        status: 'deleted',
+        updatedAt: new Date()
+    };
+    return workFlowAccessor.updateWorkFlow(id, updateData);
 };
 
 const getNextAvailableStep = async (currentStep, value, selectedOption, categoryId) => {

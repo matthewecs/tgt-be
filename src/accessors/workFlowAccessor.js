@@ -29,10 +29,12 @@ const SelectedStepSchema = new mongoose.Schema({
 
 const WorkFlowSchema = new mongoose.Schema({
     projectName: { type: String, required: true },
+    projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', default: null },
     targetProductionCapacity: { type: Number, required: true },
     selectedSteps: { type: [SelectedStepSchema], default: [] },
     totalSteps: { type: Number, required: true },
     employeeName: { type: String, required: true },
+    status: { type: String, enum: ['active', 'completed', 'cancelled', 'deleted'], default: 'active' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

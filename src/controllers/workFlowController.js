@@ -14,9 +14,16 @@ const getAll = async (req, res) => {
 
 // GET /workflow/:id
 const getById = async (req, res) => {
-    const { id } = req.params;
-    // Placeholder: Fetch workflow by id from database
-    res.json({ message: `Details of workflow with id ${id}` });
+    try {
+        const { id } = req.params;
+        const result = await workFlowService.getWorkflowById(id);
+        if (!result) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };
 
 // POST /workflow
@@ -39,9 +46,16 @@ const update = async (req, res) => {
 
 // DELETE /workflow/:id
 const deleteEntity = async (req, res) => {
-    const { id } = req.params;
-    // Placeholder: Delete workflow by id
-    res.json({ message: `Workflow with id ${id} deleted` });
+    try {
+        const { id } = req.params;
+        const result = await workFlowService.deleteWorkflow(id);
+        if (!result) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+        res.json({ message: 'Workflow deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };
 
 // GET /get-next-available-step
