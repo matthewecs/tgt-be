@@ -12,6 +12,18 @@ const getAll = async (req, res) => {
     }
 };
 
+// GET /workflow/project/:projectId
+const getByProjectId = async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const { page = 1, take = 10 } = req.query;
+        const result = await workFlowService.getWorkflowsByProjectId(projectId, page, take);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 // GET /workflow/:id
 const getById = async (req, res) => {
     try {
@@ -73,6 +85,7 @@ const getNextAvailableStep = async (req, res) => {
 
 module.exports = {
     getAll,
+    getByProjectId,
     getById,
     create,
     update,

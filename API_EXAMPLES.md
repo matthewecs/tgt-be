@@ -26,9 +26,16 @@ curl -X GET "http://localhost:4000/work-step?page=1&limit=10&search=review"
       "description": "Review legal documents for compliance",
       "options": [
         {
-          "label": "Priority",
-          "value": "high",
-          "type": "select"
+          "name": "Priority",
+          "description": "Set priority level for the task",
+          "preReqValue": 100,
+          "preReqUnit": "documents",
+          "metricValue": 50,
+          "metricUnit": "hours",
+          "price": 500,
+          "quantity": 1,
+          "minValue": 10,
+          "maxValue": 1000
         }
       ],
       "nextActions": [
@@ -77,9 +84,16 @@ curl -X GET "http://localhost:4000/work-step/64f7b8c9e1234567890abcde"
     "description": "Review legal documents for compliance",
     "options": [
       {
-        "label": "Priority",
-        "value": "high",
-        "type": "select"
+        "name": "Priority",
+        "description": "Set priority level for the task",
+        "preReqValue": 100,
+        "preReqUnit": "documents",
+        "metricValue": 50,
+        "metricUnit": "hours",
+        "price": 500,
+        "quantity": 1,
+        "minValue": 10,
+        "maxValue": 1000
       }
     ],
     "nextActions": [
@@ -105,9 +119,16 @@ curl -X POST "http://localhost:4000/work-step" \
     "description": "Perform quality assurance testing",
     "options": [
       {
-        "label": "Test Type",
-        "value": "automated",
-        "type": "select"
+        "name": "Test Coverage",
+        "description": "Percentage of code coverage required",
+        "preReqValue": 100,
+        "preReqUnit": "lines",
+        "metricValue": 80,
+        "metricUnit": "percent",
+        "price": 200,
+        "quantity": 1,
+        "minValue": 50,
+        "maxValue": 100
       }
     ],
     "nextActions": [
@@ -137,9 +158,16 @@ curl -X POST "http://localhost:4000/work-step" \
     "description": "Perform quality assurance testing",
     "options": [
       {
-        "label": "Test Type",
-        "value": "automated",
-        "type": "select"
+        "name": "Test Coverage",
+        "description": "Percentage of code coverage required",
+        "preReqValue": 100,
+        "preReqUnit": "lines",
+        "metricValue": 80,
+        "metricUnit": "percent",
+        "price": 200,
+        "quantity": 1,
+        "minValue": 50,
+        "maxValue": 100
       }
     ],
     "nextActions": [
@@ -182,9 +210,16 @@ curl -X PUT "http://localhost:4000/work-step/64f7b8c9e1234567890abcdf" \
     "description": "Perform comprehensive quality assurance testing",
     "options": [
       {
-        "label": "Test Type",
-        "value": "automated",
-        "type": "select"
+        "name": "Test Coverage",
+        "description": "Enhanced percentage of code coverage required",
+        "preReqValue": 150,
+        "preReqUnit": "lines",
+        "metricValue": 90,
+        "metricUnit": "percent",
+        "price": 250,
+        "quantity": 1,
+        "minValue": 60,
+        "maxValue": 100
       }
     ],
     "nextActions": [
@@ -220,9 +255,103 @@ curl -X DELETE "http://localhost:4000/work-step/64f7b8c9e1234567890abcdf"
 
 ## Workflow API (`/workflow`)
 
+### Get Workflows by Project ID
+```bash
+curl -X GET "http://localhost:4000/workflow/project/64f7b8c9e1234567890abce4"
+```
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "_id": "64f7b8c9e1234567890abc01",
+      "projectName": "E-commerce Development Workflow",
+      "projectId": "64f7b8c9e1234567890abce4",
+      "targetProductionCapacity": 1000,
+      "selectedSteps": [
+        {
+          "step": {
+            "id": "step1",
+            "name": "Document Review",
+            "uniqueKey": "legal-document-review",
+            "description": "Review legal documents for compliance"
+          },
+          "selectedOption": {
+            "name": "Priority",
+            "description": "Set priority level for the task",
+            "preReqValue": 100,
+            "preReqUnit": "documents",
+            "metricValue": 50,
+            "metricUnit": "hours",
+            "price": 500,
+            "quantity": 1,
+            "minValue": 10,
+            "maxValue": 1000,
+            "eligible": true,
+            "originalQuantity": 1,
+            "conversionRate": 1
+          }
+        }
+      ],
+      "totalSteps": 3,
+      "employeeName": "John Doe",
+      "status": "active",
+      "createdAt": "2024-01-25T15:00:00.000Z",
+      "updatedAt": "2024-01-25T15:00:00.000Z"
+    }
+  ],
+  "page": 1,
+  "take": 10,
+  "total": 1,
+  "totalPages": 1
+}
+```
+
+### Get Workflows by Project ID with Pagination
+```bash
+curl -X GET "http://localhost:4000/workflow/project/64f7b8c9e1234567890abce4?page=1&take=5"
+```
+
+**Response:**
+```json
+{
+  "data": [
+    {
+      "_id": "64f7b8c9e1234567890abc01",
+      "projectName": "E-commerce Development Workflow",
+      "projectId": "64f7b8c9e1234567890abce4",
+      "targetProductionCapacity": 1000,
+      "selectedSteps": [...],
+      "totalSteps": 3,
+      "employeeName": "John Doe",
+      "status": "active",
+      "createdAt": "2024-01-25T15:00:00.000Z",
+      "updatedAt": "2024-01-25T15:00:00.000Z"
+    }
+  ],
+  "page": 1,
+  "take": 5,
+  "total": 8,
+  "totalPages": 2
+}
+```
+
 ### Get Next Available Step
 ```bash
-curl -X GET "http://localhost:4000/workflow/get-next-available-step"
+curl -X POST "http://localhost:4000/workflow/get-next-available-step" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "currentStep": "document-review",
+    "value": 100,
+    "selectedOption": {
+      "option": {
+        "metricValue": 50,
+        "quantity": 1
+      }
+    },
+    "categoryId": "64f7b8c9e1234567890abcdf"
+  }'
 ```
 
 **Response:**
@@ -241,9 +370,16 @@ curl -X GET "http://localhost:4000/workflow/get-next-available-step"
     "description": "Review legal documents for compliance",
     "options": [
       {
-        "label": "Priority",
-        "value": "high",
-        "type": "select"
+        "name": "Priority",
+        "description": "Set priority level for the task",
+        "preReqValue": 100,
+        "preReqUnit": "documents",
+        "metricValue": 50,
+        "metricUnit": "hours",
+        "price": 500,
+        "quantity": 1,
+        "minValue": 10,
+        "maxValue": 1000
       }
     ],
     "nextActions": [
@@ -686,10 +822,37 @@ curl -X DELETE "http://localhost:4000/project/64f7b8c9e1234567890abce5"
 ### Search
 - `search`: Search term to filter results
 
+### WorkStep Filtering
+- `categoryId`: Filter work steps by category ID (optional)
+
 ### Example with all parameters:
 ```bash
-curl -X GET "http://localhost:4000/work-step?page=2&limit=5&search=review"
+curl -X GET "http://localhost:4000/work-step?page=2&limit=5&search=review&categoryId=64f7b8c9e1234567890abcdf"
 ```
+
+## Option Schema Fields
+
+WorkStep options contain the following fields for configuration and calculation:
+
+### Core Fields
+- `name`: Display name for the option (required)
+- `description`: Detailed description of the option
+
+### Value Constraints
+- `minValue`: Minimum allowed value for validation
+- `maxValue`: Maximum allowed value for validation
+
+### Prerequisites
+- `preReqValue`: Required input value to use this option
+- `preReqUnit`: Unit of measurement for prerequisite value
+
+### Metrics
+- `metricValue`: Output or result value produced by this option
+- `metricUnit`: Unit of measurement for metric value
+
+### Pricing
+- `price`: Cost associated with this option
+- `quantity`: Default quantity for calculations
 
 ## Status Enums
 

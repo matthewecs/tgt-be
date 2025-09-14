@@ -5,6 +5,9 @@ const workFlowController = require('../controllers/workFlowController');
 // GET all workflows
 router.get('/', workFlowController.getAll);
 
+// GET workflows by project ID
+router.get('/project/:projectId', workFlowController.getByProjectId);
+
 // GET next available step
 router.post('/get-next-available-step', workFlowController.getNextAvailableStep);
 

@@ -62,6 +62,41 @@ async function getAllWorkFlows() {
     }
 }
 
+async function getWorkFlowsByProjectId(projectId, page = 1, take = 10) {
+    try {
+        await connectToMongo();
+        
+        // Filter by projectId and exclude deleted workflows
+        const filter = {
+            projectId: projectId,
+            status: { $ne: 'deleted' }
+        };
+
+        // Pagination
+        const skip = (parseInt(page) - 1) * parseInt(take);
+        const limit = parseInt(take);
+
+        // Query with filter, pagination, and sort by createdAt
+        const items = await WorkFlow.find(filter)
+            .skip(skip)
+            .limit(limit)
+            .sort({ createdAt: -1 });
+
+        const total = await WorkFlow.countDocuments(filter);
+
+        return {
+            data: items,
+            page: parseInt(page),
+            take: parseInt(take),
+            total,
+            totalPages: Math.ceil(total / take)
+        };
+    } catch (err) {
+        console.error('Error getWorkFlowsByProjectId:', err.message);
+        throw err;
+    }
+}
+
 async function getAllWorkFlowsForListPage(keyword, page = 1, take = 10) {
     try {
         await connectToMongo();
@@ -139,6 +174,7 @@ module.exports = {
     createWorkFlow,
     getAllWorkFlows,
     getAllWorkFlowsForListPage,
+    getWorkFlowsByProjectId,
     getWorkFlowById,
     updateWorkFlow,
     deleteWorkFlow

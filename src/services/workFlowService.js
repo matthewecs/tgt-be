@@ -6,6 +6,10 @@ const getAllWorkflows = async (keyword, page = 1, take = 10) => {
     return workFlowAccessor.getAllWorkFlowsForListPage(keyword, page, take);
 };
 
+const getWorkflowsByProjectId = async (projectId, page = 1, take = 10) => {
+    return workFlowAccessor.getWorkFlowsByProjectId(projectId, page, take);
+};
+
 const getWorkflowById = async (id) => {
     const workflow = await workFlowAccessor.getWorkFlowById(id);
     
@@ -88,8 +92,9 @@ const getNextAvailableStep = async (currentStep, value, selectedOption, category
             uniqueKey: nextWorkStep.uniqueKey,
             description: nextWorkStep.description,
             options: nextWorkStep.options.map(opt => {
-                const eligible = true;
                 const base = selectedOption ? selectedOption.option.metricValue * selectedOption.option.quantity : value;
+                console.log('base', base, opt)
+                const eligible = opt.minValue <= base && base <= opt.maxValue;
                 const conversionRate = Math.ceil(base / opt.preReqValue);
                 const quantity = conversionRate * opt.quantity;
 
@@ -109,6 +114,7 @@ const getNextAvailableStep = async (currentStep, value, selectedOption, category
 
 module.exports = {
     getAllWorkflows,
+    getWorkflowsByProjectId,
     getWorkflowById,
     createWorkflow,
     updateWorkflow,

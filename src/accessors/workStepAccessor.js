@@ -9,7 +9,9 @@ const OptionSchema = new mongoose.Schema({
     metricValue: { type: Number },
     metricUnit: { type: String },
     price: { type: Number },
-    quantity: { type: Number }
+    quantity: { type: Number },
+    minValue: { type: Number },
+    maxValue: { type: Number }
 }, { _id: false });
 
 const NextActionSchema = new mongoose.Schema({
@@ -106,6 +108,7 @@ async function getAllWorkStepsForListPage(keyword, page = 1, take = 10, category
             name: 1,
             uniqueKey: 1,
             description: 1,
+            options: 1
         }
 
         // Pagination
