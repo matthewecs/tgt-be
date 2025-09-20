@@ -2,11 +2,154 @@
 
 Base URL: `http://localhost:4000`
 
+## 🔒 Authentication Required
+**All APIs (except user registration and login) require JWT authentication.**
+
+### How to Authenticate:
+1. **Register/Login** to get JWT token
+2. **Include token** in Authorization header: `Authorization: Bearer {your_jwt_token}`
+3. **Token expires** in 24 hours (configurable)
+
+### Getting Your JWT Token:
+```bash
+# 1. Register new user (if needed)
+curl -X POST http://localhost:4000/user/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"youruser","email":"your@email.com","password":"yourpass","firstName":"Your","lastName":"Name"}'
+
+# 2. Login to get token
+curl -X POST http://localhost:4000/user/login \
+  -H "Content-Type: application/json" \
+  -d '{"loginCredential":"youruser","password":"yourpass"}'
+
+# Response will include: {"data": {"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}}
+```
+
+---
+
+## User Authentication API (`/user`)
+
+### Register New User
+```bash
+curl -X POST http://localhost:4000/user/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123",
+    "firstName": "Test",
+    "lastName": "User",
+    "role": "employee"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "64f7b8c9e1234567890abcde",
+    "username": "testuser",
+    "email": "test@example.com",
+    "firstName": "Test",
+    "lastName": "User",
+    "role": "employee",
+    "status": "active",
+    "createdAt": "2023-09-06T10:30:00.000Z",
+    "updatedAt": "2023-09-06T10:30:00.000Z"
+  },
+  "message": "User created successfully"
+}
+```
+
+### Login User
+```bash
+curl -X POST http://localhost:4000/user/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "loginCredential": "testuser",
+    "password": "password123"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "_id": "64f7b8c9e1234567890abcde",
+      "username": "testuser",
+      "email": "test@example.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "role": "employee",
+      "status": "active",
+      "lastLogin": "2023-09-06T10:35:00.000Z",
+      "createdAt": "2023-09-06T10:30:00.000Z",
+      "updatedAt": "2023-09-06T10:35:00.000Z"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  },
+  "message": "Login successful"
+}
+```
+
+### Update User (requires authentication)
+```bash
+curl -X PUT http://localhost:4000/user/64f7b8c9e1234567890abcde \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{
+    "firstName": "Updated",
+    "lastName": "Name"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "64f7b8c9e1234567890abcde",
+    "username": "testuser",
+    "email": "test@example.com",
+    "firstName": "Updated",
+    "lastName": "Name",
+    "role": "employee",
+    "status": "active",
+    "lastLogin": "2023-09-06T10:35:00.000Z",
+    "createdAt": "2023-09-06T10:30:00.000Z",
+    "updatedAt": "2023-09-06T10:40:00.000Z"
+  },
+  "message": "User updated successfully"
+}
+```
+
+### Logout User (requires authentication)
+```bash
+curl -X POST http://localhost:4000/user/logout \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Logged out successfully"
+  },
+  "message": "Logout successful"
+}
+```
+
 ## WorkStep API (`/work-step`)
+**Note: All WorkStep APIs require authentication. Include JWT token in Authorization header.**
 
 ### Get All WorkSteps
 ```bash
-curl -X GET "http://localhost:4000/work-step?page=1&limit=10&search=review"
+curl -X GET "http://localhost:4000/work-step?page=1&limit=10&search=review" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -65,7 +208,8 @@ curl -X GET "http://localhost:4000/work-step?page=1&limit=10&search=review"
 
 ### Get WorkStep by ID
 ```bash
-curl -X GET "http://localhost:4000/work-step/64f7b8c9e1234567890abcde"
+curl -X GET "http://localhost:4000/work-step/64f7b8c9e1234567890abcde" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -113,6 +257,7 @@ curl -X GET "http://localhost:4000/work-step/64f7b8c9e1234567890abcde"
 ```bash
 curl -X POST "http://localhost:4000/work-step" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "name": "Quality Assurance Check",
     "categoryId": "64f7b8c9e1234567890abcdf",
@@ -192,6 +337,7 @@ curl -X POST "http://localhost:4000/work-step" \
 ```bash
 curl -X PUT "http://localhost:4000/work-step/64f7b8c9e1234567890abcdf" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "name": "Enhanced Quality Assurance Check",
     "description": "Perform comprehensive quality assurance testing"
@@ -242,7 +388,8 @@ curl -X PUT "http://localhost:4000/work-step/64f7b8c9e1234567890abcdf" \
 
 ### Delete WorkStep
 ```bash
-curl -X DELETE "http://localhost:4000/work-step/64f7b8c9e1234567890abcdf"
+curl -X DELETE "http://localhost:4000/work-step/64f7b8c9e1234567890abcdf" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -257,7 +404,8 @@ curl -X DELETE "http://localhost:4000/work-step/64f7b8c9e1234567890abcdf"
 
 ### Get Workflows by Project ID
 ```bash
-curl -X GET "http://localhost:4000/workflow/project/64f7b8c9e1234567890abce4"
+curl -X GET "http://localhost:4000/workflow/project/64f7b8c9e1234567890abce4" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -310,7 +458,8 @@ curl -X GET "http://localhost:4000/workflow/project/64f7b8c9e1234567890abce4"
 
 ### Get Workflows by Project ID with Pagination
 ```bash
-curl -X GET "http://localhost:4000/workflow/project/64f7b8c9e1234567890abce4?page=1&take=5"
+curl -X GET "http://localhost:4000/workflow/project/64f7b8c9e1234567890abce4?page=1&take=5" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -341,6 +490,7 @@ curl -X GET "http://localhost:4000/workflow/project/64f7b8c9e1234567890abce4?pag
 ```bash
 curl -X POST "http://localhost:4000/workflow/get-next-available-step" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "currentStep": "document-review",
     "value": 100,
@@ -402,7 +552,8 @@ curl -X POST "http://localhost:4000/workflow/get-next-available-step" \
 
 ### Get All Customers
 ```bash
-curl -X GET "http://localhost:4000/customer?page=1&limit=5&search=tech"
+curl -X GET "http://localhost:4000/customer?page=1&limit=5&search=tech" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -446,7 +597,8 @@ curl -X GET "http://localhost:4000/customer?page=1&limit=5&search=tech"
 
 ### Get Customer by ID
 ```bash
-curl -X GET "http://localhost:4000/customer/64f7b8c9e1234567890abce0"
+curl -X GET "http://localhost:4000/customer/64f7b8c9e1234567890abce0" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -478,6 +630,7 @@ curl -X GET "http://localhost:4000/customer/64f7b8c9e1234567890abce0"
 ```bash
 curl -X POST "http://localhost:4000/customer" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "companyName": "Innovation Labs Inc",
     "address": "456 Innovation Drive, Austin, TX 78701",
@@ -522,7 +675,8 @@ curl -X POST "http://localhost:4000/customer" \
 
 ### Get Customers for Dropdown
 ```bash
-curl -X GET "http://localhost:4000/customer/getAllForDropdownOption"
+curl -X GET "http://localhost:4000/customer/getAllForDropdownOption" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -546,7 +700,8 @@ curl -X GET "http://localhost:4000/customer/getAllForDropdownOption"
 
 ### Get All Categories
 ```bash
-curl -X GET "http://localhost:4000/workstep-category?page=1&limit=10"
+curl -X GET "http://localhost:4000/workstep-category?page=1&limit=10" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -584,6 +739,7 @@ curl -X GET "http://localhost:4000/workstep-category?page=1&limit=10"
 ```bash
 curl -X POST "http://localhost:4000/workstep-category" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "name": "Quality Assurance",
     "description": "Quality assurance and testing work steps",
@@ -608,7 +764,8 @@ curl -X POST "http://localhost:4000/workstep-category" \
 
 ### Get Categories for Dropdown
 ```bash
-curl -X GET "http://localhost:4000/workstep-category/getAllForDropdownOption"
+curl -X GET "http://localhost:4000/workstep-category/getAllForDropdownOption" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -634,7 +791,8 @@ curl -X GET "http://localhost:4000/workstep-category/getAllForDropdownOption"
 
 ### Get All Projects
 ```bash
-curl -X GET "http://localhost:4000/project?page=1&limit=5&search=website"
+curl -X GET "http://localhost:4000/project?page=1&limit=5&search=website" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -671,7 +829,8 @@ curl -X GET "http://localhost:4000/project?page=1&limit=5&search=website"
 
 ### Get Project by ID
 ```bash
-curl -X GET "http://localhost:4000/project/64f7b8c9e1234567890abce4"
+curl -X GET "http://localhost:4000/project/64f7b8c9e1234567890abce4" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**
@@ -710,6 +869,7 @@ curl -X GET "http://localhost:4000/project/64f7b8c9e1234567890abce4"
 ```bash
 curl -X POST "http://localhost:4000/project" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "name": "Mobile App Development",
     "description": "Develop a new mobile application for iOS and Android",
@@ -746,6 +906,7 @@ curl -X POST "http://localhost:4000/project" \
 ```bash
 curl -X PUT "http://localhost:4000/project/64f7b8c9e1234567890abce5" \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
   -d '{
     "status": "offering",
     "description": "Develop a comprehensive mobile application for iOS and Android with advanced features"
@@ -774,7 +935,8 @@ curl -X PUT "http://localhost:4000/project/64f7b8c9e1234567890abce5" \
 
 ### Delete Project
 ```bash
-curl -X DELETE "http://localhost:4000/project/64f7b8c9e1234567890abce5"
+curl -X DELETE "http://localhost:4000/project/64f7b8c9e1234567890abce5" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
 **Response:**

@@ -1,23 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const customerController = require('../controllers/customerController');
+const { authenticateToken } = require('../controllers/userController');
 
 // GET all customers
-router.get('/', customerController.getAll);
+router.get('/', authenticateToken, customerController.getAll);
 
 // GET all customers for dropdown options (id, name, and address only)
-router.get('/getAllForDropdownOption', customerController.getAllForDropdownOption);
+router.get('/getAllForDropdownOption', authenticateToken, customerController.getAllForDropdownOption);
 
 // GET customer by ID
-router.get('/:id', customerController.getById);
+router.get('/:id', authenticateToken, customerController.getById);
 
 // CREATE a new customer
-router.post('/', customerController.create);
+router.post('/', authenticateToken, customerController.create);
 
 // UPDATE a customer by ID
-router.put('/:id', customerController.update);
+router.put('/:id', authenticateToken, customerController.update);
 
 // DELETE a customer by ID
-router.delete('/:id', customerController.deleteEntity);
+router.delete('/:id', authenticateToken, customerController.deleteEntity);
 
 module.exports = router;
