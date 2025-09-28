@@ -1,6 +1,16 @@
 const { connectToMongo, mongoose } = require('./mongoAccessor');
 const _ = require('lodash'); // Import lodash
 
+// Custom function to create unique keys that preserve special characters
+function createUniqueKey(name) {
+    return name
+        .toLowerCase()
+        .replace(/\s+/g, '-')           // Replace spaces with hyphens
+        .replace(/[^\w\-¼½¾⅛⅜⅝⅞″'"]/g, '') // Keep word chars, hyphens, fractions, and quote marks
+        .replace(/-+/g, '-')            // Replace multiple hyphens with single
+        .replace(/^-|-$/g, '');         // Remove leading/trailing hyphens
+}
+
 const OptionSchema = new mongoose.Schema({
     name: { type: String, required: true },
     description: { type: String },
@@ -34,7 +44,7 @@ async function upsertWorkStep(datum) {
     try {
         await connectToMongo();
 
-        const uniqueKey = datum.categoryId + '-' + _.kebabCase(datum.name)
+        const uniqueKey = datum.categoryId + '-' + createUniqueKey(datum.name)
         await WorkStep.deleteOne({uniqueKey: uniqueKey});
         await WorkStep.deleteOne({_id: datum.id});
 
@@ -170,7 +180,7 @@ async function getByName(name, categoryId) {
     try {
         await connectToMongo();
         // Find WorkStep by name (case-insensitive)
-        return await WorkStep.findOne({ uniqueKey: categoryId + '-' + _.kebabCase(name) });
+        return await WorkStep.findOne({ uniqueKey: categoryId + '-' + createUniqueKey(name) });
     } catch (err) {
         console.error('Error getByName:', err.message);
         throw err;
