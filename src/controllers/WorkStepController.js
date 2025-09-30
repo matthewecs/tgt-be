@@ -11,6 +11,13 @@ const getAllWorkStepsForNextStep = async (req, res) => {
     res.json(await workStepService.getAllWorkStepsForNextStep(req.query.categoryId, req.query.currentStep))
 }
 
+// GET /work-step/category/:categoryId
+const getByCategoryId = async (req, res) => {
+    const { categoryId } = req.params;
+    
+    res.json(await workStepService.getWorkStepsByCategoryId(categoryId));
+}
+
 // GET /work-step/:id
 const getById = async (req, res) => {
     const { id } = req.params;
@@ -53,5 +60,6 @@ module.exports = {
     create,
     update,
     deleteEntity,
-    getAllWorkStepsForNextStep
+    getAllWorkStepsForNextStep,
+    getByCategoryId
 };

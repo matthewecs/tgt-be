@@ -44,6 +44,11 @@ const findsByUniqueKeys = async (uniqueKeys) => {
     return workStepAccessor.findsByUniqueKeys(uniqueKeys);
 }
 
+const getWorkStepsByCategoryId = async (categoryId) => {
+    // Get work steps filtered by categoryId with optional search and pagination
+    return workStepAccessor.getAllWorkStepsByCategoryId(categoryId);
+}
+
 module.exports = {
   saveWorkStep,
   getAllWorkStepsForNextStep,
@@ -51,5 +56,6 @@ module.exports = {
   deleteEntity,
   getById,
   getByName,
-  findsByUniqueKeys
+  findsByUniqueKeys,
+  getWorkStepsByCategoryId
 };

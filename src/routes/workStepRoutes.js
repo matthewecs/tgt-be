@@ -5,6 +5,7 @@ const { authenticateToken } = require('../controllers/userController');
 
 router.get('/', authenticateToken, workStepController.getAll);
 router.get('/next', authenticateToken, workStepController.getAllWorkStepsForNextStep);
+router.get('/category/:categoryId', authenticateToken, workStepController.getByCategoryId);
 router.get('/:id', authenticateToken, workStepController.getById);
 router.post('/', authenticateToken, workStepController.create);
 router.put('/:id', authenticateToken, workStepController.update);

@@ -146,6 +146,27 @@ async function getAllWorkStepsForListPage(keyword, page = 1, take = 10, category
     }
 }
 
+async function getAllWorkStepsByCategoryId(categoryId = null) {
+    try {
+        await connectToMongo();
+        
+        // Build filter for keyword search and optional categoryId
+        const filter = {};
+        
+        // Add categoryId filter if provided
+        if (categoryId) {
+            filter.categoryId = categoryId;
+        }
+
+        return WorkStep.find(filter)
+            .sort({ name: 1 });
+
+    } catch (err) {
+        console.error('Error getAllWorkStepsByCategoryId:', err.message);
+        throw err;
+    }
+}
+
 async function deleteEntity(id) {
     try {
         await connectToMongo();
@@ -198,4 +219,4 @@ async function findsByUniqueKeys(uniqueKeys) {
     }
 }
 
-module.exports = { upsertWorkStep, getAllWorkSteps, getAllWorkStepsWithProjection, getAllWorkStepsForListPage, deleteEntity, getById, getByName, findsByUniqueKeys };
+module.exports = { upsertWorkStep, getAllWorkSteps, getAllWorkStepsWithProjection, getAllWorkStepsForListPage, getAllWorkStepsByCategoryId, deleteEntity, getById, getByName, findsByUniqueKeys };
