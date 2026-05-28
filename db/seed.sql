@@ -16,7 +16,7 @@ INSERT INTO permissions (key, label, grp) VALUES
   ('offering:update',            'Edit Offering',               'offering'),
   ('offering:submit',            'Submit Offering for Review',  'offering'),
   ('offering:approve',           'Approve Offering',            'offering'),
-  ('offering:reject',            'Reject Offering',             'offering'),
+  ('offering:reject',            'Reject / Request Revision',   'offering'),
   ('offering:comment',           'Comment on Items',            'offering'),
   ('offering:pdf',               'Generate PDF',                'offering'),
   ('offering:status_update',     'Update Offering Status',      'offering'),

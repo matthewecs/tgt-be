@@ -77,22 +77,17 @@ Update your `.env` `DATABASE_URL` accordingly:
 DATABASE_URL=postgres://tgt_user:your_password@localhost:5432/tgt_db
 ```
 
-### Run migrations (create tables)
+### Run migration (create all tables)
 
 ```bash
-npm run db:schema
+npm run db:migrate
 ```
 
-### Run base seed (roles, permissions, role-permission assignments)
+### Seed roles, permissions, and default users
 
 ```bash
-npm run db:seed
-```
-
-### Run user seeder (creates default users)
-
-```bash
-npm run db:seed:users
+npm run db:seed       # roles, permissions, role-permission assignments
+npm run db:seed:users # default admin / owner / worker users
 ```
 
 Or run all three steps at once:

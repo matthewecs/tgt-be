@@ -2,7 +2,7 @@ const db = require('../config/db');
 const { ok, fail } = require('../helpers/response');
 const { hasPermission } = require('../middleware/auth');
 
-const CONFIDENTIAL_FIELDS = ['price_range_min', 'price_range_max', 'price_range_currency', 'actual_price', 'actual_price_currency'];
+const CONFIDENTIAL_FIELDS = ['price_range_min', 'price_range_max', 'actual_price', 'actual_price_currency'];
 
 function stripConfidential(item) {
   const out = { ...item };
@@ -74,13 +74,12 @@ exports.create = async (req, res) => {
         const item = items[i];
         await client.query(
           `INSERT INTO template_items
-             (template_id, item_name, price_range_min, price_range_max, price_range_currency,
+             (template_id, item_name, price_range_min, price_range_max,
               actual_price, actual_price_currency, quantity, is_mandatory, sort_order)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [
             template.id, item.item_name,
             item.price_range_min ?? null, item.price_range_max ?? null,
-            item.price_range_currency || 'IDR',
             item.actual_price ?? null, item.actual_price_currency || 'IDR',
             item.quantity ?? 1, item.is_mandatory ?? true, item.sort_order ?? i,
           ]
@@ -122,20 +121,18 @@ exports.update = async (req, res) => {
         );
       }
 
-      // Replace items: delete all then re-insert
       await client.query('DELETE FROM template_items WHERE template_id = $1', [id]);
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         await client.query(
           `INSERT INTO template_items
-             (template_id, item_name, price_range_min, price_range_max, price_range_currency,
+             (template_id, item_name, price_range_min, price_range_max,
               actual_price, actual_price_currency, quantity, is_mandatory, sort_order)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [
             id, item.item_name,
             item.price_range_min ?? null, item.price_range_max ?? null,
-            item.price_range_currency || 'IDR',
             item.actual_price ?? null, item.actual_price_currency || 'IDR',
             item.quantity ?? 1, item.is_mandatory ?? true, item.sort_order ?? i,
           ]
@@ -161,7 +158,6 @@ exports.remove = async (req, res) => {
     if (!rowCount) return fail(res, 404, 'Template not found');
     return ok(res, null);
   } catch (e) {
-    if (e.code === '23503') return fail(res, 400, 'Template is in use by offerings');
     console.error(e);
     return fail(res, 500, 'Server error');
   }

@@ -1,25 +1,30 @@
--- TGT Backend Database Schema
+-- TGT Water Treatment — Database Schema
+-- Run once on a fresh database: psql $DATABASE_URL -f db/schema.sql
+-- Seeders: npm run db:seed (roles/permissions) && npm run db:seed:users
 
--- Users & Auth
-CREATE TABLE IF NOT EXISTS roles (
+-- ── Roles & permissions ───────────────────────────────────────────────────────
+
+CREATE TABLE roles (
   id   SERIAL PRIMARY KEY,
-  name VARCHAR(50) UNIQUE NOT NULL
+  name VARCHAR(50) UNIQUE NOT NULL   -- 'admin' | 'owner' | 'worker'
 );
 
-CREATE TABLE IF NOT EXISTS permissions (
+CREATE TABLE permissions (
   id    SERIAL PRIMARY KEY,
   key   VARCHAR(100) UNIQUE NOT NULL,
   label VARCHAR(200) NOT NULL,
   grp   VARCHAR(50)  NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS role_permissions (
-  role_id       INT REFERENCES roles(id) ON DELETE CASCADE,
+CREATE TABLE role_permissions (
+  role_id       INT REFERENCES roles(id)       ON DELETE CASCADE,
   permission_id INT REFERENCES permissions(id) ON DELETE CASCADE,
   PRIMARY KEY (role_id, permission_id)
 );
 
-CREATE TABLE IF NOT EXISTS users (
+-- ── Users ─────────────────────────────────────────────────────────────────────
+
+CREATE TABLE users (
   id            SERIAL PRIMARY KEY,
   name          VARCHAR(200) NOT NULL,
   username      VARCHAR(100) UNIQUE NOT NULL,
@@ -29,8 +34,9 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Customers
-CREATE TABLE IF NOT EXISTS customers (
+-- ── Customers ─────────────────────────────────────────────────────────────────
+
+CREATE TABLE customers (
   id           SERIAL PRIMARY KEY,
   company_name VARCHAR(200) NOT NULL,
   city         VARCHAR(100),
@@ -41,8 +47,9 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Offering Templates
-CREATE TABLE IF NOT EXISTS offering_templates (
+-- ── Offering templates ────────────────────────────────────────────────────────
+
+CREATE TABLE offering_templates (
   id          SERIAL PRIMARY KEY,
   title       VARCHAR(300) NOT NULL,
   description TEXT,
@@ -50,58 +57,63 @@ CREATE TABLE IF NOT EXISTS offering_templates (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS template_items (
+CREATE TABLE template_items (
   id                    SERIAL PRIMARY KEY,
   template_id           INT REFERENCES offering_templates(id) ON DELETE CASCADE,
   item_name             VARCHAR(300) NOT NULL,
-  price_range_min       NUMERIC(18,2),
-  price_range_max       NUMERIC(18,2),
-  price_range_currency  VARCHAR(10) DEFAULT 'IDR',
-  actual_price          NUMERIC(18,2),
+  price_range_min       NUMERIC(18,2),           -- CONFIDENTIAL: selling price guidance (lower bound)
+  price_range_max       NUMERIC(18,2),           -- CONFIDENTIAL: selling price guidance (upper bound)
+  actual_price          NUMERIC(18,2),           -- CONFIDENTIAL: buying / cost price
   actual_price_currency VARCHAR(10) DEFAULT 'IDR',
-  quantity              INT NOT NULL DEFAULT 1,
+  quantity              INT NOT NULL DEFAULT 1,  -- minimum quantity hint for offerings
   is_mandatory          BOOLEAN DEFAULT TRUE,
   sort_order            INT DEFAULT 0
 );
 
--- Offerings
-DO $$ BEGIN
-  CREATE TYPE offering_status AS ENUM ('offering','deal','on_planning','on_going','done');
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-END $$;
+-- ── Offerings ─────────────────────────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS offerings (
+CREATE TYPE offering_status AS ENUM (
+  'draft',       -- created, not yet submitted; worker can edit
+  'on_review',   -- submitted, awaiting owner/admin review; edit locked
+  'need_revise', -- owner requested revision; worker can edit again
+  'declined',    -- owner declined
+  'approved',    -- owner approved; worker may generate PDF
+  'offering',    -- PDF generated/sent; auto-set on first PDF download
+  'on_going',    -- project in progress; manual advance by owner/admin
+  'done'         -- project completed
+);
+
+CREATE TABLE offerings (
   id          SERIAL PRIMARY KEY,
   title       VARCHAR(300) NOT NULL,
   customer_id INT REFERENCES customers(id) NOT NULL,
   template_id INT REFERENCES offering_templates(id),
-  status      offering_status DEFAULT 'offering',
-  submitted_at TIMESTAMPTZ,
-  approved_at  TIMESTAMPTZ,
-  reviewed_by  INT REFERENCES users(id),
-  created_by   INT REFERENCES users(id) NOT NULL,
-  created_at   TIMESTAMPTZ DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ DEFAULT NOW()
+  status      offering_status NOT NULL DEFAULT 'draft',
+  approved_at TIMESTAMPTZ,
+  reviewed_by INT REFERENCES users(id),
+  created_by  INT REFERENCES users(id) NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS offering_items (
+CREATE TABLE offering_items (
   id                    SERIAL PRIMARY KEY,
   offering_id           INT REFERENCES offerings(id) ON DELETE CASCADE,
-  template_item_id      INT REFERENCES template_items(id),
+  template_item_id      INT,                     -- snapshot reference only, no FK
   item_name             VARCHAR(300) NOT NULL,
   quantity              INT NOT NULL,
-  template_min_quantity INT,
-  selling_price         NUMERIC(18,2),
-  selling_currency      VARCHAR(10) DEFAULT 'IDR',
-  buying_price          NUMERIC(18,2),
+  template_min_quantity INT,                     -- copied from template at creation; FE validation hint
+  price_range_min       NUMERIC(18,2),           -- CONFIDENTIAL: snapshotted from template
+  price_range_max       NUMERIC(18,2),           -- CONFIDENTIAL: snapshotted from template
+  selling_price         NUMERIC(18,2),           -- set by worker, always IDR
+  buying_price          NUMERIC(18,2),           -- CONFIDENTIAL: snapshotted from template actual_price
   buying_currency       VARCHAR(10) DEFAULT 'IDR',
   is_mandatory          BOOLEAN DEFAULT TRUE,
   owner_comment         TEXT,
   sort_order            INT DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS offering_logs (
+CREATE TABLE offering_logs (
   id          SERIAL PRIMARY KEY,
   offering_id INT REFERENCES offerings(id) ON DELETE CASCADE,
   user_id     INT REFERENCES users(id),
@@ -110,8 +122,9 @@ CREATE TABLE IF NOT EXISTS offering_logs (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Payments
-CREATE TABLE IF NOT EXISTS payments (
+-- ── Payments ──────────────────────────────────────────────────────────────────
+
+CREATE TABLE payments (
   id                  SERIAL PRIMARY KEY,
   offering_id         INT REFERENCES offerings(id) ON DELETE CASCADE,
   amount              NUMERIC(18,2) NOT NULL,

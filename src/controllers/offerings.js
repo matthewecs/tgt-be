@@ -3,6 +3,18 @@ const { ok, fail } = require('../helpers/response');
 const { hasPermission } = require('../middleware/auth');
 const { generateOfferingPDF } = require('../helpers/pdf');
 
+// Converts empty string / undefined to null for NUMERIC columns
+const num = (v) => (v === '' || v === undefined ? null : v);
+
+// Statuses where the worker may edit the offering
+const EDITABLE_STATUSES = ['draft', 'need_revise'];
+
+// Statuses where the PDF may be downloaded
+const PDF_ALLOWED_STATUSES = ['approved', 'offering', 'on_going', 'done'];
+
+// Manual status progression (owner/admin only, sequential)
+const STATUS_NEXT = { offering: 'on_going', on_going: 'done' };
+
 async function computeTotals(offeringId) {
   const [capRows, revRows] = await Promise.all([
     db.query(
@@ -11,8 +23,8 @@ async function computeTotals(offeringId) {
       [offeringId]
     ),
     db.query(
-      `SELECT selling_currency AS currency, SUM(quantity * selling_price) AS total
-       FROM offering_items WHERE offering_id = $1 GROUP BY selling_currency`,
+      `SELECT 'IDR' AS currency, SUM(quantity * selling_price) AS total
+       FROM offering_items WHERE offering_id = $1`,
       [offeringId]
     ),
   ]);
@@ -84,28 +96,43 @@ exports.getById = async (req, res) => {
     `, [req.params.id]);
 
     if (!rows[0]) return fail(res, 404, 'Offering not found');
-
     const offering = rows[0];
 
     if (!canReadAll && offering.created_by !== req.user.id) {
       return fail(res, 403, 'Access denied');
     }
 
-    const { rows: items } = await db.query(
-      'SELECT * FROM offering_items WHERE offering_id = $1 ORDER BY sort_order, id',
-      [offering.id]
-    );
+    const [itemRows, logRows] = await Promise.all([
+      db.query(
+        'SELECT * FROM offering_items WHERE offering_id = $1 ORDER BY sort_order, id',
+        [offering.id]
+      ),
+      db.query(
+        `SELECT l.id, l.action, l.details, l.created_at, l.user_id, u.name AS user_name
+         FROM offering_logs l
+         LEFT JOIN users u ON u.id = l.user_id
+         WHERE l.offering_id = $1
+         ORDER BY l.created_at ASC`,
+        [offering.id]
+      ),
+    ]);
 
-    offering.items = items.map(item => {
+    offering.items = itemRows.rows.map(item => {
       if (!canReadConfidential) {
-        const { buying_price, buying_currency, ...rest } = item;
+        const { buying_price, buying_currency, price_range_min, price_range_max, ...rest } = item;
         return rest;
       }
       return item;
     });
 
+    offering.logs = logRows.rows;
+
     const totals = await computeTotals(offering.id);
-    Object.assign(offering, totals);
+    if (canReadConfidential) {
+      Object.assign(offering, totals);
+    } else {
+      offering.total_revenue = totals.total_revenue;
+    }
 
     return ok(res, offering);
   } catch (e) {
@@ -124,8 +151,8 @@ exports.create = async (req, res) => {
       await client.query('BEGIN');
 
       const { rows } = await client.query(
-        `INSERT INTO offerings (title, customer_id, template_id, created_by)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
+        `INSERT INTO offerings (title, customer_id, template_id, created_by, status)
+         VALUES ($1, $2, $3, $4, 'draft') RETURNING *`,
         [title, customer_id, template_id || null, req.user.id]
       );
       const offering = rows[0];
@@ -133,14 +160,23 @@ exports.create = async (req, res) => {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
 
-        // Validate quantity against template_min_quantity
         let templateMinQty = null;
+        let templateBuyingPrice = null;
+        let templateBuyingCurrency = 'IDR';
+        let templatePriceRangeMin = null;
+        let templatePriceRangeMax = null;
         if (item.template_item_id) {
           const { rows: ti } = await client.query(
-            'SELECT quantity FROM template_items WHERE id = $1',
+            'SELECT quantity, actual_price, actual_price_currency, price_range_min, price_range_max FROM template_items WHERE id = $1',
             [item.template_item_id]
           );
-          if (ti[0]) templateMinQty = ti[0].quantity;
+          if (ti[0]) {
+            templateMinQty = ti[0].quantity;
+            templateBuyingPrice = ti[0].actual_price;
+            templateBuyingCurrency = ti[0].actual_price_currency || 'IDR';
+            templatePriceRangeMin = ti[0].price_range_min;
+            templatePriceRangeMax = ti[0].price_range_max;
+          }
         }
 
         if (templateMinQty !== null && item.quantity < templateMinQty) {
@@ -148,16 +184,21 @@ exports.create = async (req, res) => {
           return fail(res, 422, `Item "${item.item_name}" quantity must be at least ${templateMinQty}`);
         }
 
+        const buyingPrice = num(item.buying_price) ?? templateBuyingPrice;
+        const buyingCurrency = (item.buying_currency && item.buying_currency !== '') ? item.buying_currency : templateBuyingCurrency;
+
         await client.query(
           `INSERT INTO offering_items
              (offering_id, template_item_id, item_name, quantity, template_min_quantity,
-              selling_price, selling_currency, buying_price, buying_currency, is_mandatory, sort_order)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+              price_range_min, price_range_max,
+              selling_price, buying_price, buying_currency, is_mandatory, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
           [
             offering.id, item.template_item_id ?? null, item.item_name, item.quantity,
             templateMinQty,
-            item.selling_price ?? null, item.selling_currency || 'IDR',
-            item.buying_price ?? null, item.buying_currency || 'IDR',
+            templatePriceRangeMin, templatePriceRangeMax,
+            num(item.selling_price),
+            buyingPrice, buyingCurrency,
             item.is_mandatory ?? true, item.sort_order ?? i,
           ]
         );
@@ -187,8 +228,8 @@ exports.update = async (req, res) => {
     if (!rows[0]) return fail(res, 404, 'Offering not found');
 
     const offering = rows[0];
-    if (offering.submitted_at) {
-      return fail(res, 409, 'Offering is locked pending review');
+    if (!EDITABLE_STATUSES.includes(offering.status)) {
+      return fail(res, 409, `Offering cannot be edited in status "${offering.status}"`);
     }
 
     const client = await db.getClient();
@@ -209,12 +250,18 @@ exports.update = async (req, res) => {
         const item = items[i];
 
         let templateMinQty = null;
+        let templatePriceRangeMin = null;
+        let templatePriceRangeMax = null;
         if (item.template_item_id) {
           const { rows: ti } = await client.query(
-            'SELECT quantity FROM template_items WHERE id = $1',
+            'SELECT quantity, price_range_min, price_range_max FROM template_items WHERE id = $1',
             [item.template_item_id]
           );
-          if (ti[0]) templateMinQty = ti[0].quantity;
+          if (ti[0]) {
+            templateMinQty = ti[0].quantity;
+            templatePriceRangeMin = ti[0].price_range_min;
+            templatePriceRangeMax = ti[0].price_range_max;
+          }
         }
 
         if (templateMinQty !== null && item.quantity < templateMinQty) {
@@ -228,16 +275,15 @@ exports.update = async (req, res) => {
                item_name = COALESCE($1, item_name),
                quantity = COALESCE($2, quantity),
                selling_price = COALESCE($3, selling_price),
-               selling_currency = COALESCE($4, selling_currency),
-               buying_price = COALESCE($5, buying_price),
-               buying_currency = COALESCE($6, buying_currency),
-               is_mandatory = COALESCE($7, is_mandatory),
-               sort_order = COALESCE($8, sort_order)
-             WHERE id = $9 AND offering_id = $10`,
+               buying_price = COALESCE($4, buying_price),
+               buying_currency = COALESCE($5, buying_currency),
+               is_mandatory = COALESCE($6, is_mandatory),
+               sort_order = COALESCE($7, sort_order)
+             WHERE id = $8 AND offering_id = $9`,
             [
               item.item_name ?? null, item.quantity ?? null,
-              item.selling_price ?? null, item.selling_currency ?? null,
-              item.buying_price ?? null, item.buying_currency ?? null,
+              num(item.selling_price),
+              num(item.buying_price), item.buying_currency ?? null,
               item.is_mandatory ?? null, item.sort_order ?? i,
               item.id, id,
             ]
@@ -246,13 +292,15 @@ exports.update = async (req, res) => {
           await client.query(
             `INSERT INTO offering_items
                (offering_id, template_item_id, item_name, quantity, template_min_quantity,
-                selling_price, selling_currency, buying_price, buying_currency, is_mandatory, sort_order)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+                price_range_min, price_range_max,
+                selling_price, buying_price, buying_currency, is_mandatory, sort_order)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
             [
               id, item.template_item_id ?? null, item.item_name, item.quantity,
               templateMinQty,
-              item.selling_price ?? null, item.selling_currency || 'IDR',
-              item.buying_price ?? null, item.buying_currency || 'IDR',
+              templatePriceRangeMin ?? null, templatePriceRangeMax ?? null,
+              num(item.selling_price),
+              num(item.buying_price), item.buying_currency || 'IDR',
               item.is_mandatory ?? true, item.sort_order ?? i,
             ]
           );
@@ -278,17 +326,20 @@ exports.update = async (req, res) => {
 exports.submit = async (req, res) => {
   try {
     const { id } = req.params;
-    const { rows } = await db.query('SELECT * FROM offerings WHERE id = $1', [id]);
+    const { rows } = await db.query('SELECT status FROM offerings WHERE id = $1', [id]);
     if (!rows[0]) return fail(res, 404, 'Offering not found');
 
-    const o = rows[0];
-    if (o.submitted_at) return fail(res, 400, 'Offering is already submitted');
-    if (o.approved_at) return fail(res, 400, 'Offering is already approved');
+    if (!EDITABLE_STATUSES.includes(rows[0].status)) {
+      return fail(res, 400, `Cannot submit an offering with status "${rows[0].status}"`);
+    }
 
     const client = await db.getClient();
     try {
       await client.query('BEGIN');
-      await client.query('UPDATE offerings SET submitted_at = NOW(), updated_at = NOW() WHERE id = $1', [id]);
+      await client.query(
+        `UPDATE offerings SET status = 'on_review', updated_at = NOW() WHERE id = $1`,
+        [id]
+      );
       await addLog(client, id, req.user.id, 'submitted', null);
       await client.query('COMMIT');
       return ok(res, null);
@@ -307,14 +358,18 @@ exports.submit = async (req, res) => {
 exports.approve = async (req, res) => {
   try {
     const { id } = req.params;
-    const { rows } = await db.query('SELECT * FROM offerings WHERE id = $1', [id]);
+    const { rows } = await db.query('SELECT status FROM offerings WHERE id = $1', [id]);
     if (!rows[0]) return fail(res, 404, 'Offering not found');
+
+    if (rows[0].status !== 'on_review') {
+      return fail(res, 400, `Can only approve offerings with status "on_review"`);
+    }
 
     const client = await db.getClient();
     try {
       await client.query('BEGIN');
       await client.query(
-        'UPDATE offerings SET approved_at = NOW(), reviewed_by = $1, updated_at = NOW() WHERE id = $2',
+        `UPDATE offerings SET status = 'approved', approved_at = NOW(), reviewed_by = $1, updated_at = NOW() WHERE id = $2`,
         [req.user.id, id]
       );
       await addLog(client, id, req.user.id, 'approved', null);
@@ -336,17 +391,21 @@ exports.reject = async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    const { rows } = await db.query('SELECT id FROM offerings WHERE id = $1', [id]);
+    const { rows } = await db.query('SELECT status FROM offerings WHERE id = $1', [id]);
     if (!rows[0]) return fail(res, 404, 'Offering not found');
+
+    if (rows[0].status !== 'on_review') {
+      return fail(res, 400, `Can only decline offerings with status "on_review"`);
+    }
 
     const client = await db.getClient();
     try {
       await client.query('BEGIN');
       await client.query(
-        'UPDATE offerings SET submitted_at = NULL, updated_at = NOW() WHERE id = $1',
+        `UPDATE offerings SET status = 'declined', updated_at = NOW() WHERE id = $1`,
         [id]
       );
-      await addLog(client, id, req.user.id, 'rejected', reason || null);
+      await addLog(client, id, req.user.id, 'declined', reason || null);
       await client.query('COMMIT');
       return ok(res, null);
     } catch (e) {
@@ -365,14 +424,18 @@ exports.revision = async (req, res) => {
   try {
     const { id } = req.params;
     const { comment } = req.body;
-    const { rows } = await db.query('SELECT id FROM offerings WHERE id = $1', [id]);
+    const { rows } = await db.query('SELECT status FROM offerings WHERE id = $1', [id]);
     if (!rows[0]) return fail(res, 404, 'Offering not found');
+
+    if (rows[0].status !== 'on_review') {
+      return fail(res, 400, `Can only request revision on offerings with status "on_review"`);
+    }
 
     const client = await db.getClient();
     try {
       await client.query('BEGIN');
       await client.query(
-        'UPDATE offerings SET submitted_at = NULL, updated_at = NOW() WHERE id = $1',
+        `UPDATE offerings SET status = 'need_revise', updated_at = NOW() WHERE id = $1`,
         [id]
       );
       await addLog(client, id, req.user.id, 'revision_requested', comment || null);
@@ -390,21 +453,24 @@ exports.revision = async (req, res) => {
   }
 };
 
-const VALID_STATUSES = ['offering', 'deal', 'on_planning', 'on_going', 'done'];
-
 exports.updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!VALID_STATUSES.includes(status)) {
-      return fail(res, 400, `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`);
-    }
-
     const { rows } = await db.query('SELECT status FROM offerings WHERE id = $1', [id]);
     if (!rows[0]) return fail(res, 404, 'Offering not found');
 
-    const oldStatus = rows[0].status;
+    const currentStatus = rows[0].status;
+    const expectedNext = STATUS_NEXT[currentStatus];
+
+    if (!expectedNext || status !== expectedNext) {
+      return fail(res, 422,
+        expectedNext
+          ? `Status must advance to "${expectedNext}" from "${currentStatus}"`
+          : `Status "${currentStatus}" cannot be manually advanced`
+      );
+    }
 
     const client = await db.getClient();
     try {
@@ -413,7 +479,7 @@ exports.updateStatus = async (req, res) => {
         `UPDATE offerings SET status = $1::offering_status, updated_at = NOW() WHERE id = $2`,
         [status, id]
       );
-      await addLog(client, id, req.user.id, 'status_changed', `${oldStatus} → ${status}`);
+      await addLog(client, id, req.user.id, 'status_changed', `${currentStatus} → ${status}`);
       await client.query('COMMIT');
       return ok(res, null);
     } catch (e) {
@@ -437,16 +503,23 @@ exports.itemComment = async (req, res) => {
     const { rows } = await db.query('SELECT id FROM offerings WHERE id = $1', [id]);
     if (!rows[0]) return fail(res, 404, 'Offering not found');
 
-    const { rowCount } = await db.query(
+    const { rows: itemRows } = await db.query(
+      'SELECT item_name FROM offering_items WHERE id = $1 AND offering_id = $2',
+      [item_id, id]
+    );
+    if (!itemRows[0]) return fail(res, 404, 'Item not found');
+
+    await db.query(
       'UPDATE offering_items SET owner_comment = $1 WHERE id = $2 AND offering_id = $3',
       [comment || null, item_id, id]
     );
-    if (!rowCount) return fail(res, 404, 'Item not found');
 
     const client = await db.getClient();
     try {
       await client.query('BEGIN');
-      await addLog(client, id, req.user.id, 'item_commented', `item_id: ${item_id}`);
+      await addLog(client, id, req.user.id, 'item_commented',
+        `${itemRows[0].item_name}: ${(comment || '').slice(0, 100)}`
+      );
       await client.query('COMMIT');
     } finally {
       client.release();
@@ -483,7 +556,6 @@ exports.getLogs = async (req, res) => {
 exports.getPDF = async (req, res) => {
   try {
     const { id } = req.params;
-    const canReadAll = hasPermission(req.user, 'offering:read_all');
 
     const { rows } = await db.query(`
       SELECT o.*,
@@ -497,16 +569,15 @@ exports.getPDF = async (req, res) => {
     `, [id]);
 
     if (!rows[0]) return fail(res, 404, 'Offering not found');
-
     const offering = rows[0];
 
-    // Workers can only generate PDF after approval
-    if (!canReadAll && !offering.approved_at) {
-      return fail(res, 403, 'PDF is only available after the offering is approved');
+    if (!PDF_ALLOWED_STATUSES.includes(offering.status)) {
+      return fail(res, 403, `PDF is not available in status "${offering.status}"`);
     }
 
     const { rows: items } = await db.query(
-      'SELECT item_name, quantity, selling_price, selling_currency FROM offering_items WHERE offering_id = $1 ORDER BY sort_order, id',
+      `SELECT item_name, quantity, selling_price, is_mandatory
+       FROM offering_items WHERE offering_id = $1 ORDER BY sort_order, id`,
       [id]
     );
     offering.items = items;
@@ -515,6 +586,25 @@ exports.getPDF = async (req, res) => {
     offering.total_revenue = totals.total_revenue;
 
     const pdfBuffer = await generateOfferingPDF(offering);
+
+    // Auto-advance from 'approved' → 'offering' on first download
+    if (offering.status === 'approved') {
+      const client = await db.getClient();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `UPDATE offerings SET status = 'offering', updated_at = NOW() WHERE id = $1`,
+          [id]
+        );
+        await addLog(client, id, req.user.id, 'pdf_generated', null);
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        console.error('Failed to advance status after PDF generation:', e);
+      } finally {
+        client.release();
+      }
+    }
 
     res.set({
       'Content-Type': 'application/pdf',
