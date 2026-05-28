@@ -8,60 +8,58 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev           # start with nodemon (auto-reload)
 npm start             # production start
 
-npm run db:migrate    # run db/schema.sql on a fresh database
-npm run db:seed       # run db/seed.sql (roles, permissions, role-permission assignments)
-npm run db:seed:users # insert seed users via db/userSeed.js
+npm run db:migrate    # create all tables on a fresh database (db/schema.sql)
+npm run db:seed       # insert roles, permissions, role-permission assignments (db/seed.sql)
+npm run db:seed:users # insert default users via db/userSeed.js
 npm run db:setup      # all three above in sequence
 ```
 
-`db:schema` and `db:seed` use `db/run-sql.js` as a wrapper so they read `DATABASE_URL` from `.env` via dotenv before calling `psql`. Direct `psql $DATABASE_URL` in npm scripts does **not** read `.env`.
+`db:migrate` and `db:seed` go through `db/run-sql.js` which reads `DATABASE_URL` from `.env` via dotenv before invoking `psql`. Direct shell `psql $DATABASE_URL` does **not** read `.env`.
 
 ## Architecture
 
-**Pattern:** flat route → controller. No service layer. Each route file mounts an Express router; each controller file exports async handler functions directly.
+**Pattern:** route file → controller function. No service layer. Each route file mounts an Express router and wires permission middleware; each controller exports plain async handlers.
 
 ```
-src/server.js              # mounts all routers, error handler
-src/middleware/auth.js     # authenticate() + requirePermission(key) + hasPermission(user, key)
-src/helpers/response.js    # ok(res, data) / fail(res, status, msg) — used everywhere
-src/helpers/pdf.js         # pdfkit offering PDF generator
-src/config/db.js           # pg Pool, exports { query, getClient }
-src/routes/offerings.js    # also mounts payment sub-routes (/offerings/:id/payments/...)
+src/server.js              # Express entry — mounts all routers, 404/500 handlers
+src/config/db.js           # pg Pool; exports { query, getClient }
+src/middleware/auth.js     # authenticate(), requirePermission(key), hasPermission(user, key)
+src/helpers/response.js    # ok(res, data) / fail(res, status, msg)
+src/helpers/pdf.js         # pdfkit PDF renderer for offerings
+src/routes/offerings.js    # also owns /offerings/:id/payments/* sub-routes
 ```
 
-**Auth flow:** `authenticate` middleware verifies the JWT, then re-fetches the user + role + permissions from the DB on every request and attaches it to `req.user`. `requirePermission(key)` is route-level middleware. `hasPermission(user, key)` is called inside controllers to conditionally shape responses (e.g. strip confidential fields).
+**Auth:** `authenticate` verifies JWT, re-fetches user + role + full permissions array from DB on every request → `req.user`. `requirePermission(key)` is Express middleware used on routes. `hasPermission(user, key)` is used inside controllers to shape responses (e.g. strip confidential fields, filter owned-only rows).
 
-**Confidential field stripping** is done in-controller, not in a middleware layer:
-- `template:read_confidential` → controls `price_range_*` and `actual_price*` on template items
-- `offering:read_confidential` → controls `buying_price`, `buying_currency`, and `total_capital` on offering items
+**Confidential field stripping** happens inside controllers, never in middleware:
+- `template:read_confidential` — strips `price_range_min`, `price_range_max`, `actual_price`, `actual_price_currency` from template items
+- `offering:read_confidential` — strips `buying_price`, `buying_currency`, `price_range_min`, `price_range_max` from offering items; omits `total_capital`
 
-**Multi-currency totals** are always objects keyed by currency string, never converted:
-```js
-{ "IDR": 45000000, "USD": 1200 }
-```
-Computed via `computeTotals(offeringId)` in `controllers/offerings.js` using GROUP BY currency SQL.
+**Currency:** selling price is always IDR — no `selling_currency` column. `buying_currency` exists on offering items. `computeTotals()` returns `{ total_revenue: { IDR: n }, total_capital: { <currency>: n } }`.
 
 **Offering status machine:**
 ```
-draft ──submit──▶ on_review ──approve──▶ approved ──1st PDF download──▶ offering ──▶ on_going ──▶ done
+draft ──submit──▶ on_review ──approve──▶ approved ──1st PDF──▶ offering ──▶ on_going ──▶ done
                       │
                  need_revise ◀──revision──┤
                  declined    ◀──reject────┘
 ```
-- Edit allowed only in `draft` or `need_revise` (constant `EDITABLE_STATUSES`). Returns HTTP 409 otherwise.
-- `submit` / `approve` / `reject` / `revision` each guard against wrong current status and return HTTP 400.
-- `PATCH /offerings/:id/status` enforces sequential `offering → on_going → done` via `STATUS_NEXT` map. Returns HTTP 422 for any other transition.
-- First PDF download (`status = 'approved'`) auto-advances to `'offering'` and logs `pdf_generated`. Subsequent downloads do not change status.
-- PDF access requires status in `PDF_ALLOWED_STATUSES = ['approved', 'offering', 'on_going', 'done']`.
+- `EDITABLE_STATUSES = ['draft', 'need_revise']` — PUT returns 409 for any other status
+- Each workflow action (submit/approve/reject/revision) validates current status, returns 400 if wrong
+- `PATCH /offerings/:id/status` enforces `STATUS_NEXT = { offering→on_going, on_going→done }`, returns 422 otherwise
+- First PDF download when `status = 'approved'` auto-advances to `'offering'` and logs `pdf_generated`
+- `PDF_ALLOWED_STATUSES = ['approved', 'offering', 'on_going', 'done']`
 
-**Transactions:** any mutation touching multiple tables uses `db.getClient()` with explicit `BEGIN/COMMIT/ROLLBACK`. All offering mutations must also call `addLog(client, offeringId, userId, action, details)` inside the same transaction.
+**Offering logs:** every mutation calls `addLog(client, offeringId, userId, action, details)` inside the same DB transaction. `GET /offerings/:id` includes `logs[]` in the response. `GET /offerings/:id/logs` is a standalone endpoint.
 
-**Numeric fields from frontend:** The FE sends empty strings (`""`) for blank price fields. Use `num(v)` (defined at top of `controllers/offerings.js`) before passing any price value to a query parameter. `??` alone does not catch `""`.
+**Transactions:** any write touching multiple tables uses `db.getClient()` with `BEGIN / COMMIT / ROLLBACK`. Always release the client in `finally`.
+
+**Template → Offering snapshot:** when creating an offering, the controller queries `template_items` for `quantity`, `actual_price`, `actual_price_currency`, `price_range_min`, `price_range_max` and copies them into the offering item row. `template_item_id` is stored as a plain integer (no FK) so templates can be freely edited/deleted after the snapshot.
+
+**`num(v)` helper:** FE sends `""` for empty price fields. `num(v)` converts `""` / `undefined` → `null` before any value reaches a NUMERIC query param. `??` alone does not catch empty strings.
 
 ## Database
 
-Schema is idempotent (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`). Safe to re-run `db:setup`.
+Single migration file: `db/schema.sql`. Drop DB and re-run `npm run db:setup` for a clean state.
 
-Roles: `admin` (all permissions), `owner` (read-all + approve/reject/comment), `worker` (own offerings only, submit, PDF after approval).
-
-Dev seed users: `admin/admin123`, `owner/owner123`, `worker/worker123`.
+Seed users (dev): `admin / admin123`, `owner / owner123`, `worker / worker123`.
