@@ -26,7 +26,8 @@ INSERT INTO permissions (key, label, grp) VALUES
   ('customer:delete',            'Delete Customer',             'customer'),
   ('payment:manage',             'Manage Payments',             'payment'),
   ('user:manage',                'Manage Users',                'admin'),
-  ('role:manage',                'Manage Roles & Permissions',  'admin')
+  ('role:manage',                'Manage Roles & Permissions',  'admin'),
+  ('company:manage',             'Manage Company Profile',      'company')
 ON CONFLICT (key) DO NOTHING;
 
 -- Admin gets everything
@@ -41,7 +42,8 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.key IN (
   'offering:read_all', 'offering:read_confidential',
   'offering:approve', 'offering:reject', 'offering:comment', 'offering:status_update',
   'customer:create', 'customer:read',
-  'payment:manage'
+  'payment:manage',
+  'company:manage'
 ) WHERE r.name = 'owner'
 ON CONFLICT DO NOTHING;
 

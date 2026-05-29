@@ -12,6 +12,7 @@
     "db:setup": "npm run db:migrate && npm run db:seed && npm run db:seed:users"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
