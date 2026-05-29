@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI    = require('openai');
 const { ok, fail } = require('../helpers/response');
 
 function siteUrl() {
@@ -74,12 +75,15 @@ For articles, produce a well-structured markdown article with a title, introduct
 
 async function aiSuggest(req, res) {
   const { type, topic } = req.body;
-  if (!type || !topic) {
-    return fail(res, 400, 'type and topic are required');
-  }
-  if (!['faq', 'article'].includes(type)) {
+  if (!type || !topic) return fail(res, 400, 'type and topic are required');
+  if (!['faq', 'article'].includes(type))
     return fail(res, 400, 'type must be "faq" or "article"');
-  }
+
+  const useAnthropic  = !!process.env.ANTHROPIC_API_KEY;
+  const useOpenRouter = !!process.env.OPENROUTER_API_KEY;
+
+  if (!useAnthropic && !useOpenRouter)
+    return fail(res, 503, 'No AI provider configured. Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY.');
 
   const userMessage = type === 'faq'
     ? `Write a FAQ entry about: ${topic}`
@@ -89,30 +93,63 @@ async function aiSuggest(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  let ended = false;
+  const endOnce = () => { if (!ended) { ended = true; res.end(); } };
 
-  const stream = client.messages.stream({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userMessage }],
+  // Path A: Anthropic SDK — takes priority if both keys are set
+  if (useAnthropic) {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const stream = client.messages.stream({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    stream.on('text', (text) => { if (!ended) res.write(`data: ${JSON.stringify({ text })}\n\n`); });
+    stream.on('error', (err) => {
+      console.error(`[ai/anthropic] stream error (type=${type}, topic=${topic}):`, err.message);
+      if (!ended) res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+      endOnce();
+    });
+    stream.on('end', () => {
+      console.log(`[ai/anthropic] stream complete (type=${type}, topic=${topic})`);
+      if (!ended) res.write('data: [DONE]\n\n');
+      endOnce();
+    });
+    return;
+  }
+
+  // Path B: OpenRouter — free Claude access via openrouter.ai
+  const openai = new OpenAI({
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
   });
 
-  stream.on('text', (text) => {
-    res.write(`data: ${JSON.stringify({ text })}\n\n`);
-  });
+  try {
+    const stream = await openai.chat.completions.create({
+      model: 'anthropic/claude-sonnet-4-5',
+      max_tokens: 1024,
+      stream: true,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user',   content: userMessage },
+      ],
+    });
 
-  stream.on('error', (err) => {
-    console.error(`[ai] stream error (type=${type}, topic=${topic}):`, err.message);
-    res.write(`data: ${JSON.stringify({ error: 'Stream error' })}\n\n`);
-    res.end();
-  });
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content;
+      if (text && !ended) res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    }
 
-  stream.on('end', () => {
-    console.log(`[ai] stream complete (type=${type}, topic=${topic})`);
-    res.write('data: [DONE]\n\n');
-    res.end();
-  });
+    if (!ended) res.write('data: [DONE]\n\n');
+    console.log(`[ai/openrouter] stream complete (type=${type}, topic=${topic})`);
+    endOnce();
+  } catch (err) {
+    console.error(`[ai/openrouter] stream error (type=${type}, topic=${topic}):`, err.message);
+    if (!ended) res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+    endOnce();
+  }
 }
 
 module.exports = {
