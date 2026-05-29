@@ -33,6 +33,48 @@ exports.listPermissions = async (_req, res) => {
   }
 };
 
+exports.createRole = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) return fail(res, 400, 'name is required');
+
+    const { rows } = await db.query(
+      'INSERT INTO roles (name) VALUES ($1) RETURNING id, name',
+      [name.trim().toLowerCase()]
+    );
+    return ok(res, { id: rows[0].id, name: rows[0].name, permissions: [] });
+  } catch (e) {
+    if (e.code === '23505') return fail(res, 400, 'Role name already exists');
+    console.error(e);
+    return fail(res, 500, 'Server error');
+  }
+};
+
+exports.deleteRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { rows } = await db.query('SELECT name FROM roles WHERE id = $1', [id]);
+    if (!rows[0]) return fail(res, 404, 'Role not found');
+    if (rows[0].name === 'admin') return fail(res, 403, 'The admin role cannot be deleted');
+
+    const { rows: users } = await db.query(
+      'SELECT COUNT(*) AS count FROM users WHERE role_id = $1',
+      [id]
+    );
+    const count = parseInt(users[0].count, 10);
+    if (count > 0) {
+      return fail(res, 409, `Cannot delete: ${count} user${count > 1 ? 's are' : ' is'} still assigned to this role`);
+    }
+
+    await db.query('DELETE FROM roles WHERE id = $1', [id]);
+    return ok(res, null);
+  } catch (e) {
+    console.error(e);
+    return fail(res, 500, 'Server error');
+  }
+};
+
 exports.setRolePermissions = async (req, res) => {
   try {
     const { id } = req.params;

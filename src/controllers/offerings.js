@@ -23,8 +23,8 @@ async function computeTotals(offeringId) {
       [offeringId]
     ),
     db.query(
-      `SELECT 'IDR' AS currency, SUM(quantity * selling_price) AS total
-       FROM offering_items WHERE offering_id = $1`,
+      `SELECT selling_currency AS currency, SUM(quantity * selling_price) AS total
+       FROM offering_items WHERE offering_id = $1 GROUP BY selling_currency`,
       [offeringId]
     ),
   ]);
@@ -119,7 +119,7 @@ exports.getById = async (req, res) => {
 
     offering.items = itemRows.rows.map(item => {
       if (!canReadConfidential) {
-        const { buying_price, buying_currency, price_range_min, price_range_max, ...rest } = item;
+        const { buying_price, buying_currency, ...rest } = item;
         return rest;
       }
       return item;
@@ -163,19 +163,15 @@ exports.create = async (req, res) => {
         let templateMinQty = null;
         let templateBuyingPrice = null;
         let templateBuyingCurrency = 'IDR';
-        let templatePriceRangeMin = null;
-        let templatePriceRangeMax = null;
         if (item.template_item_id) {
           const { rows: ti } = await client.query(
-            'SELECT quantity, actual_price, actual_price_currency, price_range_min, price_range_max FROM template_items WHERE id = $1',
+            'SELECT quantity, actual_price, actual_price_currency FROM template_items WHERE id = $1',
             [item.template_item_id]
           );
           if (ti[0]) {
             templateMinQty = ti[0].quantity;
             templateBuyingPrice = ti[0].actual_price;
             templateBuyingCurrency = ti[0].actual_price_currency || 'IDR';
-            templatePriceRangeMin = ti[0].price_range_min;
-            templatePriceRangeMax = ti[0].price_range_max;
           }
         }
 
@@ -190,14 +186,12 @@ exports.create = async (req, res) => {
         await client.query(
           `INSERT INTO offering_items
              (offering_id, template_item_id, item_name, quantity, template_min_quantity,
-              price_range_min, price_range_max,
-              selling_price, buying_price, buying_currency, is_mandatory, sort_order)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+              selling_price, selling_currency, buying_price, buying_currency, is_mandatory, sort_order)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [
             offering.id, item.template_item_id ?? null, item.item_name, item.quantity,
             templateMinQty,
-            templatePriceRangeMin, templatePriceRangeMax,
-            num(item.selling_price),
+            num(item.selling_price), item.selling_currency || 'IDR',
             buyingPrice, buyingCurrency,
             item.is_mandatory ?? true, item.sort_order ?? i,
           ]
@@ -250,18 +244,12 @@ exports.update = async (req, res) => {
         const item = items[i];
 
         let templateMinQty = null;
-        let templatePriceRangeMin = null;
-        let templatePriceRangeMax = null;
         if (item.template_item_id) {
           const { rows: ti } = await client.query(
-            'SELECT quantity, price_range_min, price_range_max FROM template_items WHERE id = $1',
+            'SELECT quantity FROM template_items WHERE id = $1',
             [item.template_item_id]
           );
-          if (ti[0]) {
-            templateMinQty = ti[0].quantity;
-            templatePriceRangeMin = ti[0].price_range_min;
-            templatePriceRangeMax = ti[0].price_range_max;
-          }
+          if (ti[0]) templateMinQty = ti[0].quantity;
         }
 
         if (templateMinQty !== null && item.quantity < templateMinQty) {
@@ -275,14 +263,15 @@ exports.update = async (req, res) => {
                item_name = COALESCE($1, item_name),
                quantity = COALESCE($2, quantity),
                selling_price = COALESCE($3, selling_price),
-               buying_price = COALESCE($4, buying_price),
-               buying_currency = COALESCE($5, buying_currency),
-               is_mandatory = COALESCE($6, is_mandatory),
-               sort_order = COALESCE($7, sort_order)
-             WHERE id = $8 AND offering_id = $9`,
+               selling_currency = COALESCE($4, selling_currency),
+               buying_price = COALESCE($5, buying_price),
+               buying_currency = COALESCE($6, buying_currency),
+               is_mandatory = COALESCE($7, is_mandatory),
+               sort_order = COALESCE($8, sort_order)
+             WHERE id = $9 AND offering_id = $10`,
             [
               item.item_name ?? null, item.quantity ?? null,
-              num(item.selling_price),
+              num(item.selling_price), item.selling_currency ?? null,
               num(item.buying_price), item.buying_currency ?? null,
               item.is_mandatory ?? null, item.sort_order ?? i,
               item.id, id,
@@ -292,14 +281,12 @@ exports.update = async (req, res) => {
           await client.query(
             `INSERT INTO offering_items
                (offering_id, template_item_id, item_name, quantity, template_min_quantity,
-                price_range_min, price_range_max,
-                selling_price, buying_price, buying_currency, is_mandatory, sort_order)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+                selling_price, selling_currency, buying_price, buying_currency, is_mandatory, sort_order)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
             [
               id, item.template_item_id ?? null, item.item_name, item.quantity,
               templateMinQty,
-              templatePriceRangeMin ?? null, templatePriceRangeMax ?? null,
-              num(item.selling_price),
+              num(item.selling_price), item.selling_currency || 'IDR',
               num(item.buying_price), item.buying_currency || 'IDR',
               item.is_mandatory ?? true, item.sort_order ?? i,
             ]
@@ -576,7 +563,7 @@ exports.getPDF = async (req, res) => {
     }
 
     const { rows: items } = await db.query(
-      `SELECT item_name, quantity, selling_price, is_mandatory
+      `SELECT item_name, quantity, selling_price, selling_currency, is_mandatory
        FROM offering_items WHERE offering_id = $1 ORDER BY sort_order, id`,
       [id]
     );

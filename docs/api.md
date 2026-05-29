@@ -15,7 +15,7 @@ Base URL: `http://localhost:4000`
 Authorization: Bearer <token>
 ```
 
-**HTTP status codes used:**
+**HTTP status codes:**
 | Code | Meaning |
 |------|---------|
 | 200 | OK |
@@ -23,8 +23,8 @@ Authorization: Bearer <token>
 | 401 | Missing or invalid token |
 | 403 | Valid token, insufficient permission |
 | 404 | Resource not found |
-| 409 | Conflict (e.g. edit locked) |
-| 422 | Validation failure (e.g. quantity too low, invalid status transition) |
+| 409 | Conflict (edit locked, role in use, etc.) |
+| 422 | Validation failure (quantity too low, invalid status transition) |
 | 500 | Server error |
 
 ---
@@ -39,7 +39,7 @@ No auth required.
 { "loginCredential": "username_or_email", "password": "string" }
 ```
 
-**Response**
+**Response 200**
 ```json
 {
   "success": true,
@@ -66,7 +66,7 @@ No auth required.
 Returns `{ "success": true, "data": null }`.
 
 ### `GET /user/me`
-Returns the current user in the same shape as the login `user` object.
+Returns current user in the same shape as the login `user` object (including `role.permissions[]`).
 
 ### `PUT /user/me/password`
 ```json
@@ -79,7 +79,7 @@ Returns the current user in the same shape as the login `user` object.
 > Requires `user:manage`
 
 ### `GET /users`
-Returns all users with role + permissions. No `password_hash`.
+All users with role + permissions. Never includes `password_hash`.
 
 ### `POST /users`
 ```json
@@ -99,19 +99,36 @@ Blocked for self. Returns 400 if user has associated data.
 ## Roles & Permissions
 
 ### `GET /roles`
-Returns all roles with their `permissions[]`. No special permission required beyond being authenticated.
+All roles with their `permissions[]`. Authenticated users only.
+
+### `POST /roles`
+> Requires `role:manage`
+
+Creates a new role with an empty permission set.
+```json
+{ "name": "supervisor" }
+```
+**Response 200:** `{ "id": 4, "name": "supervisor", "permissions": [] }`
+**Response 400:** name already taken
+
+### `DELETE /roles/:id`
+> Requires `role:manage`
+
+Blocked if any users are still assigned. The `admin` role is permanently protected.
+**Response 409:** `"Cannot delete: 3 users are still assigned to this role"`
+**Response 403:** attempt to delete `admin` role
 
 ### `GET /permissions`
-Returns all permission definitions.
+All permission definitions (`id`, `key`, `label`, `group`).
 
 ### `PUT /roles/:id/permissions`
 > Requires `role:manage`
 
 Replaces the full permission set for a role.
 ```json
-{ "permissions": ["template:read", "offering:create"] }
+{ "permissions": ["template:read", "offering:create", "offering:read_own"] }
 ```
-Returns the updated role with new permissions.
+Returns updated role with new permissions.
 
 ---
 
@@ -119,7 +136,6 @@ Returns the updated role with new permissions.
 > All routes require `customer:read`
 
 ### `GET /customers`
-All customers.
 
 ### `POST /customers`
 > Requires `customer:create`
@@ -143,15 +159,15 @@ All customers.
 
 ### `GET /customers/:id/offerings`
 Role-filtered:
-- `offering:read_all` (owner/admin) → full offering objects with `total_capital` + `total_revenue`
-- `offering:read_own` (worker) → `{ id, title, status, created_at, created_by_name }` only
+- `offering:read_all` → full offering objects with `total_capital` + `total_revenue`
+- `offering:read_own` → `{ id, title, status, created_at, created_by_name }` only
 
 ---
 
 ## Offering Templates — `/offering-templates`
 > All routes require `template:read`
 
-**Confidential fields** (`price_range_min`, `price_range_max`, `actual_price`, `actual_price_currency`) are stripped from items for users without `template:read_confidential`.
+Confidential fields (`price_range_min`, `price_range_max`, `price_range_currency`, `actual_price`, `actual_price_currency`) are stripped from items for users without `template:read_confidential`.
 
 ### `GET /offering-templates`
 All templates with `items[]`.
@@ -167,6 +183,7 @@ All templates with `items[]`.
       "item_name": "Filter Housing",
       "price_range_min": 5000000,
       "price_range_max": 8000000,
+      "price_range_currency": "IDR",
       "actual_price": 4200000,
       "actual_price_currency": "IDR",
       "quantity": 2,
@@ -176,14 +193,15 @@ All templates with `items[]`.
   ]
 }
 ```
-Note: `price_range_currency` no longer exists — selling is always IDR.
 
 ### `GET /offering-templates/:id`
+Worker sees items as `{ id, item_name, quantity, is_mandatory }`.
+Admin/Owner sees all fields including confidential.
 
 ### `PUT /offering-templates/:id`
 > Requires `template:update`
 
-Replaces the full items array (delete all + re-insert).
+Replaces full items array (delete all + re-insert).
 
 ### `DELETE /offering-templates/:id`
 > Requires `template:delete`
@@ -195,9 +213,9 @@ Replaces the full items array (delete all + re-insert).
 ### `GET /offerings`
 Role-filtered:
 - `offering:read_all` → all offerings
-- `offering:read_own` → only own offerings
+- `offering:read_own` → only own
 
-Each item includes `customer { id, company_name }` and `created_by_name`.
+Each row includes `customer { id, company_name }` and `created_by_name`.
 Users with `offering:read_confidential` also receive `total_capital` + `total_revenue`.
 
 ### `POST /offerings`
@@ -216,6 +234,7 @@ Creates offering with `status = 'draft'`. Buying price is snapshotted from `temp
       "item_name": "Filter Housing",
       "quantity": 4,
       "selling_price": 9500000,
+      "selling_currency": "IDR",
       "buying_price": "",
       "buying_currency": "IDR",
       "is_mandatory": true
@@ -223,16 +242,14 @@ Creates offering with `status = 'draft'`. Buying price is snapshotted from `temp
   ]
 }
 ```
-
-Returns `{ "id": 5 }`.
+Returns `{ "id": 5 }`. Logs `created`.
 
 ### `GET /offerings/:id`
-Full detail. Includes:
-- `customer` (all fields)
-- `items[]` — confidential fields (`buying_price`, `buying_currency`, `price_range_min`, `price_range_max`) stripped for users without `offering:read_confidential`
-- `total_revenue: { "IDR": n }` — always included
-- `total_capital: { <currency>: n }` — only for `offering:read_confidential`
-- `logs[]` — full audit trail, ordered ASC
+Full detail. Includes `customer` (all fields), `items[]`, totals, and `logs[]`.
+
+Confidential stripping on items for users without `offering:read_confidential`:
+- Strips `buying_price`, `buying_currency`
+- Omits `total_capital`
 
 ```json
 {
@@ -245,8 +262,8 @@ Full detail. Includes:
   "created_by_name": "Adi Kurniawan",
   "created_at": "2025-02-01T08:00:00Z",
   "updated_at": "2025-02-01T08:00:00Z",
-  "customer": { "id": 1, "company_name": "PT. Aqua Murni", "city": "Jakarta", "contact_name": "Budi", "phone": "+62...", "email": "..." },
   "template_id": 2,
+  "customer": { "id": 1, "company_name": "PT. Aqua Murni", "city": "Jakarta", "contact_name": "Budi", "phone": "+62...", "email": "..." },
   "items": [
     {
       "id": 22,
@@ -254,9 +271,8 @@ Full detail. Includes:
       "item_name": "Filter Housing",
       "quantity": 4,
       "template_min_quantity": 2,
-      "price_range_min": 5000000,
-      "price_range_max": 8000000,
       "selling_price": 9500000,
+      "selling_currency": "IDR",
       "buying_price": 4200000,
       "buying_currency": "IDR",
       "is_mandatory": true,
@@ -267,7 +283,7 @@ Full detail. Includes:
   "total_revenue": { "IDR": 38000000 },
   "total_capital": { "IDR": 16800000 },
   "logs": [
-    { "id": 1, "action": "created", "user_id": 3, "user_name": "Adi Kurniawan", "details": null, "created_at": "..." }
+    { "id": 1, "action": "created", "user_id": 3, "user_name": "Adi", "details": null, "created_at": "..." }
   ]
 }
 ```
@@ -278,16 +294,12 @@ Full detail. Includes:
 ```json
 {
   "items": [
-    { "id": 22, "quantity": 5, "selling_price": 9800000 },
-    { "item_name": "Extra UV Filter", "quantity": 1, "selling_price": 2000000, "buying_price": 1200000, "buying_currency": "IDR", "is_mandatory": false }
+    { "id": 22, "quantity": 5, "selling_price": 9800000, "selling_currency": "IDR" },
+    { "item_name": "Extra UV Filter", "quantity": 1, "selling_price": 2000000, "selling_currency": "IDR", "buying_price": 1200000, "buying_currency": "IDR", "is_mandatory": false }
   ]
 }
 ```
-- Items with `id`: update in place
-- Items without `id`: insert as new
-- Items in DB but absent from body: deleted
-
-Logs `updated`.
+Items with `id`: update. Items without `id`: insert. Items absent from body: deleted. Logs `updated`.
 
 ---
 
@@ -296,19 +308,17 @@ Logs `updated`.
 ### `POST /offerings/:id/submit`
 > Requires `offering:submit`
 
-Valid from: `draft`, `need_revise` → sets `status = 'on_review'`.
-Logs `submitted`.
+Valid from `draft` or `need_revise` → `on_review`. Logs `submitted`.
 
 ### `POST /offerings/:id/approve`
 > Requires `offering:approve`
 
-Valid from: `on_review` → sets `status = 'approved'`, records `approved_at` + `reviewed_by`.
-Logs `approved`.
+Valid from `on_review` → `approved`. Sets `approved_at` + `reviewed_by`. Logs `approved`.
 
 ### `POST /offerings/:id/reject`
 > Requires `offering:reject`
 
-Valid from: `on_review` → sets `status = 'declined'`.
+Valid from `on_review` → `declined`.
 ```json
 { "reason": "string" }
 ```
@@ -317,7 +327,7 @@ Logs `declined` with reason.
 ### `POST /offerings/:id/revision`
 > Requires `offering:reject`
 
-Valid from: `on_review` → sets `status = 'need_revise'`. Worker can edit and resubmit.
+Valid from `on_review` → `need_revise`. Worker can edit and resubmit.
 ```json
 { "comment": "string" }
 ```
@@ -326,9 +336,9 @@ Logs `revision_requested` with comment.
 ### `PATCH /offerings/:id/status`
 > Requires `offering:status_update`
 
-Manual sequential advance by owner/admin only:
-- `on_going` when current is `offering`
-- `done` when current is `on_going`
+Sequential advance by owner/admin only:
+- `offering` → `on_going`
+- `on_going` → `done`
 
 Any other transition returns **422**.
 ```json
@@ -339,7 +349,7 @@ Logs `status_changed` with `"offering → on_going"`.
 ### `POST /offerings/:id/item-comment`
 > Requires `offering:comment`
 
-Sets/overwrites `owner_comment` on a single item. Visible to all users who can read the offering.
+Sets `owner_comment` on a single item. Visible to all users who can read the offering.
 ```json
 { "item_id": 22, "comment": "Please confirm supplier availability." }
 ```
@@ -359,19 +369,10 @@ Content-Disposition: attachment; filename="offering-<id>.pdf"
 Access-Control-Expose-Headers: Content-Disposition
 ```
 
-PDF contains: company header, offering title/date/status, customer info, items table (name, qty, selling price IDR, mandatory flag), total revenue.
+PDF contains: TGT header, offering title/date/status, customer info, items table (name, qty, selling price, currency, mandatory flag), total revenue per currency.
 
 ### `GET /offerings/:id/logs`
-Audit log ordered `created_at ASC`. Also included in `GET /offerings/:id` response.
-
-```json
-[
-  { "id": 1, "action": "created",   "user_id": 3, "user_name": "Adi", "details": null,            "created_at": "..." },
-  { "id": 2, "action": "submitted", "user_id": 3, "user_name": "Adi", "details": null,            "created_at": "..." },
-  { "id": 3, "action": "approved",  "user_id": 2, "user_name": "Owner", "details": null,          "created_at": "..." },
-  { "id": 4, "action": "status_changed", "user_id": 2, "user_name": "Owner", "details": "offering → on_going", "created_at": "..." }
-]
-```
+Audit log ordered `created_at ASC`. Also included in `GET /offerings/:id`.
 
 **Log action values:**
 | action | triggered by |

@@ -32,10 +32,10 @@ src/routes/offerings.js    # also owns /offerings/:id/payments/* sub-routes
 **Auth:** `authenticate` verifies JWT, re-fetches user + role + full permissions array from DB on every request → `req.user`. `requirePermission(key)` is Express middleware used on routes. `hasPermission(user, key)` is used inside controllers to shape responses (e.g. strip confidential fields, filter owned-only rows).
 
 **Confidential field stripping** happens inside controllers, never in middleware:
-- `template:read_confidential` — strips `price_range_min`, `price_range_max`, `actual_price`, `actual_price_currency` from template items
-- `offering:read_confidential` — strips `buying_price`, `buying_currency`, `price_range_min`, `price_range_max` from offering items; omits `total_capital`
+- `template:read_confidential` — strips `price_range_min`, `price_range_max`, `price_range_currency`, `actual_price`, `actual_price_currency` from template items
+- `offering:read_confidential` — strips `buying_price`, `buying_currency` from offering items; omits `total_capital`
 
-**Currency:** selling price is always IDR — no `selling_currency` column. `buying_currency` exists on offering items. `computeTotals()` returns `{ total_revenue: { IDR: n }, total_capital: { <currency>: n } }`.
+**Currency:** full multi-currency. `offering_items` has `selling_price` + `selling_currency` and `buying_price` + `buying_currency`. `template_items` has `price_range_currency` and `actual_price_currency`. `computeTotals()` groups by currency: `{ total_revenue: { IDR: n }, total_capital: { IDR: n, USD: n } }`.
 
 **Offering status machine:**
 ```
@@ -54,7 +54,7 @@ draft ──submit──▶ on_review ──approve──▶ approved ──1st 
 
 **Transactions:** any write touching multiple tables uses `db.getClient()` with `BEGIN / COMMIT / ROLLBACK`. Always release the client in `finally`.
 
-**Template → Offering snapshot:** when creating an offering, the controller queries `template_items` for `quantity`, `actual_price`, `actual_price_currency`, `price_range_min`, `price_range_max` and copies them into the offering item row. `template_item_id` is stored as a plain integer (no FK) so templates can be freely edited/deleted after the snapshot.
+**Template → Offering snapshot:** when creating an offering, the controller queries `template_items` for `quantity`, `actual_price`, `actual_price_currency` and copies them into the offering item row as `template_min_quantity` and `buying_price`/`buying_currency`. `template_item_id` is stored as a plain integer (no FK) so templates can be freely edited/deleted after the snapshot.
 
 **`num(v)` helper:** FE sends `""` for empty price fields. `num(v)` converts `""` / `undefined` → `null` before any value reaches a NUMERIC query param. `??` alone does not catch empty strings.
 

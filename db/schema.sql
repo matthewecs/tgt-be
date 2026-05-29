@@ -63,6 +63,7 @@ CREATE TABLE template_items (
   item_name             VARCHAR(300) NOT NULL,
   price_range_min       NUMERIC(18,2),           -- CONFIDENTIAL: selling price guidance (lower bound)
   price_range_max       NUMERIC(18,2),           -- CONFIDENTIAL: selling price guidance (upper bound)
+  price_range_currency  VARCHAR(10) DEFAULT 'IDR',
   actual_price          NUMERIC(18,2),           -- CONFIDENTIAL: buying / cost price
   actual_price_currency VARCHAR(10) DEFAULT 'IDR',
   quantity              INT NOT NULL DEFAULT 1,  -- minimum quantity hint for offerings
@@ -103,10 +104,9 @@ CREATE TABLE offering_items (
   item_name             VARCHAR(300) NOT NULL,
   quantity              INT NOT NULL,
   template_min_quantity INT,                     -- copied from template at creation; FE validation hint
-  price_range_min       NUMERIC(18,2),           -- CONFIDENTIAL: snapshotted from template
-  price_range_max       NUMERIC(18,2),           -- CONFIDENTIAL: snapshotted from template
-  selling_price         NUMERIC(18,2),           -- set by worker, always IDR
-  buying_price          NUMERIC(18,2),           -- CONFIDENTIAL: snapshotted from template actual_price
+  selling_price         NUMERIC(18,2),
+  selling_currency      VARCHAR(10) DEFAULT 'IDR',
+  buying_price          NUMERIC(18,2),           -- CONFIDENTIAL
   buying_currency       VARCHAR(10) DEFAULT 'IDR',
   is_mandatory          BOOLEAN DEFAULT TRUE,
   owner_comment         TEXT,

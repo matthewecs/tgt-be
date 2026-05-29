@@ -119,8 +119,8 @@ exports.getOfferings = async (req, res) => {
             [o.id]
           ),
           db.query(
-            `SELECT 'IDR' AS currency, SUM(quantity * selling_price) AS total
-             FROM offering_items WHERE offering_id = $1`,
+            `SELECT selling_currency AS currency, SUM(quantity * selling_price) AS total
+             FROM offering_items WHERE offering_id = $1 GROUP BY selling_currency`,
             [o.id]
           ),
         ]);

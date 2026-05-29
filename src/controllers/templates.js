@@ -2,7 +2,7 @@ const db = require('../config/db');
 const { ok, fail } = require('../helpers/response');
 const { hasPermission } = require('../middleware/auth');
 
-const CONFIDENTIAL_FIELDS = ['price_range_min', 'price_range_max', 'actual_price', 'actual_price_currency'];
+const CONFIDENTIAL_FIELDS = ['price_range_min', 'price_range_max', 'price_range_currency', 'actual_price', 'actual_price_currency'];
 
 function stripConfidential(item) {
   const out = { ...item };
@@ -74,12 +74,13 @@ exports.create = async (req, res) => {
         const item = items[i];
         await client.query(
           `INSERT INTO template_items
-             (template_id, item_name, price_range_min, price_range_max,
+             (template_id, item_name, price_range_min, price_range_max, price_range_currency,
               actual_price, actual_price_currency, quantity, is_mandatory, sort_order)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           [
             template.id, item.item_name,
             item.price_range_min ?? null, item.price_range_max ?? null,
+            item.price_range_currency || 'IDR',
             item.actual_price ?? null, item.actual_price_currency || 'IDR',
             item.quantity ?? 1, item.is_mandatory ?? true, item.sort_order ?? i,
           ]

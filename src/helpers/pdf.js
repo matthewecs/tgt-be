@@ -69,7 +69,7 @@ async function generateOfferingPDF(offering) {
          .text(item.item_name, col.name, y, { continued: true, width: 270 })
          .text(String(item.quantity || 0), col.qty, y, { continued: true, width: 40, align: 'right' })
          .text(formatNumber(item.selling_price), col.price, y, { continued: true, width: 90, align: 'right' })
-         .text('IDR', col.currency, y, { continued: true, width: 50, align: 'center' })
+         .text(item.selling_currency || 'IDR', col.currency, y, { continued: true, width: 50, align: 'center' })
          .text(formatNumber(subtotal), col.total, y, { width: 60, align: 'right' });
       doc.moveDown(0.3);
     });
