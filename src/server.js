@@ -18,6 +18,7 @@ app.use('/customers', require('./routes/customers'));
 app.use('/offering-templates', require('./routes/templates'));
 app.use('/offerings', require('./routes/offerings'));
 app.use('/company', require('./routes/company'));
+app.use('/internal', require('./routes/internal'));
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });

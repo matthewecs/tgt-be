@@ -13,8 +13,11 @@ function apiHeaders() {
   };
 }
 
-async function proxyRequest(res, method, path, body) {
-  const url = `${siteUrl()}/api/content${path}`;
+async function proxyRequest(res, method, path, body, query) {
+  let url = `${siteUrl()}/api/content${path}`;
+  if (query && Object.keys(query).length > 0) {
+    url += '?' + new URLSearchParams(query).toString();
+  }
   console.log(`[proxy] ${method} ${url}`);
   try {
     const opts = { method, headers: apiHeaders() };
@@ -46,7 +49,7 @@ const wrap = fn => (req, res, next) => fn(req, res).catch(next);
 
 // ── Portfolio ────────────────────────────────────────────────────────────────
 
-const listPortfolio   = wrap((req, res) => proxyRequest(res, 'GET',    '/portfolio'));
+const listPortfolio   = wrap((req, res) => proxyRequest(res, 'GET',    '/portfolio', null, req.query));
 const createPortfolio = wrap((req, res) => proxyRequest(res, 'POST',   '/portfolio',                    req.body));
 const updatePortfolio = wrap((req, res) => proxyRequest(res, 'PUT',    `/portfolio/${req.params.id}`,   req.body));
 const deletePortfolio = wrap((req, res) => proxyRequest(res, 'DELETE', `/portfolio/${req.params.id}`));
@@ -60,24 +63,78 @@ const deleteFaq = wrap((req, res) => proxyRequest(res, 'DELETE', `/faq/${req.par
 
 // ── Articles ─────────────────────────────────────────────────────────────────
 
-const listArticles   = wrap((req, res) => proxyRequest(res, 'GET',    '/articles'));
+const listArticles   = wrap((req, res) => proxyRequest(res, 'GET',    '/articles', null, req.query));
 const getArticle     = wrap((req, res) => proxyRequest(res, 'GET',    `/articles/${req.params.id}`));
 const createArticle  = wrap((req, res) => proxyRequest(res, 'POST',   '/articles',                    req.body));
 const updateArticle  = wrap((req, res) => proxyRequest(res, 'PUT',    `/articles/${req.params.id}`,   req.body));
 const deleteArticle  = wrap((req, res) => proxyRequest(res, 'DELETE', `/articles/${req.params.id}`));
 
+// ── Gallery Items ─────────────────────────────────────────────────────────────
+
+const listGalleryItems   = wrap((req, res) => proxyRequest(res, 'GET',    '/gallery-items', null, req.query));
+const createGalleryItem  = wrap((req, res) => proxyRequest(res, 'POST',   '/gallery-items',                    req.body));
+const updateGalleryItem  = wrap((req, res) => proxyRequest(res, 'PUT',    `/gallery-items/${req.params.id}`,   req.body));
+const deleteGalleryItem  = wrap((req, res) => proxyRequest(res, 'DELETE', `/gallery-items/${req.params.id}`));
+
+// ── Products ──────────────────────────────────────────────────────────────────
+
+const listProducts   = wrap((req, res) => proxyRequest(res, 'GET',    '/products', null, req.query));
+const getProduct     = wrap((req, res) => proxyRequest(res, 'GET',    `/products/${req.params.id}`));
+const createProduct  = wrap((req, res) => proxyRequest(res, 'POST',   '/products',                    req.body));
+const updateProduct  = wrap((req, res) => proxyRequest(res, 'PUT',    `/products/${req.params.id}`,   req.body));
+const deleteProduct  = wrap((req, res) => proxyRequest(res, 'DELETE', `/products/${req.params.id}`));
+
 // ── AI Content Suggestion (SSE streaming) ────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a helpful content writer for PT. Tirta Gesang Tunggal, an Indonesian water treatment company.
-Write professional, informative content in Bahasa Indonesia or English as appropriate.
-For FAQs, produce a clear question and a concise, factual answer.
-For articles, produce a well-structured markdown article with a title, introduction, body sections, and a conclusion.`;
+const SYSTEM_PROMPT = `Anda adalah asisten konten untuk PT Tirta Gesang Tunggal, perusahaan solusi air di Indonesia.
+
+Profil perusahaan:
+- Spesialisasi: Air Minum Dalam Kemasan (AMDK), pengolahan air bersih, dan IPAL
+- Produk unggulan: Mesin filling SUNHAI kapasitas 2.000–7.000 botol/jam
+- Layanan: Pembangunan pabrik AMDK, konsultasi SNI & izin edar BPOM, sistem IPAL
+- Workshop di Bekasi dan Yogyakarta, melayani seluruh Indonesia
+- Target: Pengusaha AMDK pemula, industri, fasilitas kesehatan
+
+Panduan penulisan:
+- Bahasa Indonesia profesional namun mudah dipahami
+- Fokus pada nilai bisnis dan manfaat praktis bagi calon pelanggan
+- Sertakan informasi teknis relevan (kapasitas, sertifikasi, regulasi) bila sesuai
+- Jangan menyebut nama kompetitor`;
+
+const PROMPTS = {
+  faq: (topic) => `Buat 5 pasang pertanyaan dan jawaban FAQ untuk topik: "${topic}".
+Format setiap item:
+Q: [pertanyaan]
+A: [jawaban lengkap]
+
+Pisahkan setiap item dengan baris kosong.`,
+
+  article: (topic) => `Tulis artikel lengkap dalam Markdown tentang: "${topic}".
+
+Format output:
+# [Judul Artikel]
+
+**Deskripsi:** [1-2 kalimat ringkasan untuk SEO]
+
+**Tags:** [tag1, tag2, tag3]
+
+---
+
+[Isi artikel dengan heading ##, paragraf, dan poin relevan. Minimum 400 kata.]`,
+
+  'product-description': (topic) => `Tulis deskripsi produk untuk: "${topic}".
+
+Format output:
+[2-3 paragraf deskripsi produk yang menarik dan informatif. Jelaskan fungsi, keunggulan, dan cocok untuk siapa. Tidak perlu heading.]`,
+};
+
+const MAX_TOKENS = { faq: 1500, article: 3000, 'product-description': 1500 };
 
 async function aiSuggest(req, res) {
   const { type, topic } = req.body;
   if (!type || !topic) return fail(res, 400, 'type and topic are required');
-  if (!['faq', 'article'].includes(type))
-    return fail(res, 400, 'type must be "faq" or "article"');
+  if (!PROMPTS[type])
+    return fail(res, 400, 'type must be "faq", "article", or "product-description"');
 
   const useAnthropic  = !!process.env.ANTHROPIC_API_KEY;
   const useOpenRouter = !!process.env.OPENROUTER_API_KEY;
@@ -85,9 +142,8 @@ async function aiSuggest(req, res) {
   if (!useAnthropic && !useOpenRouter)
     return fail(res, 503, 'No AI provider configured. Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY.');
 
-  const userMessage = type === 'faq'
-    ? `Write a FAQ entry about: ${topic}`
-    : `Write a blog article about: ${topic}`;
+  const userMessage = PROMPTS[type](topic);
+  const maxTokens   = MAX_TOKENS[type];
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -101,7 +157,7 @@ async function aiSuggest(req, res) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const stream = client.messages.stream({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
     });
@@ -129,7 +185,7 @@ async function aiSuggest(req, res) {
   try {
     const stream = await openai.chat.completions.create({
       model: 'anthropic/claude-sonnet-4-5',
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       stream: true,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -156,5 +212,7 @@ module.exports = {
   listPortfolio, createPortfolio, updatePortfolio, deletePortfolio,
   listFaq, createFaq, updateFaq, deleteFaq,
   listArticles, getArticle, createArticle, updateArticle, deleteArticle,
+  listGalleryItems, createGalleryItem, updateGalleryItem, deleteGalleryItem,
+  listProducts, getProduct, createProduct, updateProduct, deleteProduct,
   aiSuggest,
 };
